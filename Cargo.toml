@@ -1,5 +1,5 @@
 [package]
-name = "masters_thesis"
+name = "dop_with_aco"
 version = "0.1.0"
 authors = ["Sebastian Ossinger <sebastian.ossinger@mail.de>"]
 edition = "2018"
