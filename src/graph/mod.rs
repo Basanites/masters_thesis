@@ -1,6 +1,7 @@
 mod graph;
 mod error;
 mod matrix_graph;
+pub mod export;
 
 pub use graph::{ Graph, WeightedGraph, Edge };
 pub use error::{ GraphError };
