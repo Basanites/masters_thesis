@@ -82,6 +82,10 @@ pub trait WeightedGraph<Nw, Ew> {
     /// This in turn means all edges from or to this node will be removed.
     fn remove_node(&mut self, id: usize);
 
+    /// Changes the weight of a node to the new weight.
+    /// Adds the node, if it was not in the graph before.
+    fn change_node(&mut self, id: usize, weight: Nw);
+
     /// Returns the count of neighbors at node with given id. 
     /// Returns an error if the node is not in the graph.
     fn degree(&self, id: usize) -> Result<usize, GraphError>;
@@ -102,4 +106,9 @@ pub trait WeightedGraph<Nw, Ew> {
 
     /// Removes a weighted edge from the graph.
     fn remove_edge(&mut self, edge: Edge);
+
+    /// Changes the weight of a edge to the new weight.
+    /// If the edge did not exist before, it gets created in this process.
+    /// If the new edge can't be created, because one of the nodes is not in the graph this errors.
+    fn change_edge(&mut self, edge: Edge, weight: Ew) -> Result<(), GraphError>;
 }

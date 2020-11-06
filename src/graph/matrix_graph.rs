@@ -167,7 +167,7 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
         Ok(())
     }
 
-    fn remove_node(&mut self, id:usize) {
+    fn remove_node(&mut self, id: usize) {
         if self.has_node(id) {
             // If a node is removed from the graph there can't be any edges to or from it.
             for i in 0..self.order {
@@ -178,6 +178,15 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
             self.node_weights[id] = None;
             // Removing the node reduces order by one.
             self.order -= 1;
+        }
+    }
+
+    fn change_node(&mut self, id: usize, weight: Nw) {
+        if self.has_node(id) {
+            self.node_weights[id] = Some(weight);
+        } else {
+            // Unwrapping is ok here, because we ensured, we don't have this node id yet.
+            self.add_node(id, weight).unwrap();
         }
     }
 
@@ -243,6 +252,15 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
             self.adjacency_matrix[edge.0][edge.1] = None;
             // Removing an edge reduces size by one.
             self.size -= 1;
+        }
+    }
+    
+    fn change_edge(&mut self, edge: Edge, weight: Ew) -> Result<(), GraphError> {
+        if self.has_edge(edge) {
+            self.adjacency_matrix[edge.0][edge.1] = Some(weight);
+            Ok(())
+        } else {
+            self.add_edge(edge, weight)
         }
     }
 }
