@@ -1,98 +1,155 @@
 use std::fs::File;
+use std::io::Write;
 use osmpbfreader::OsmPbfReader;
 use osmpbfreader::objects::Node;
 use osmpbfreader::{OsmId, OsmObj, NodeId};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{HashMap, BTreeMap, HashSet};
+use std::time::SystemTime;
 
 mod graph;
 use graph::{MatrixGraph, WeightedGraph, GraphError};
 use graph::generate::{Grid, Generate};
 use graph::export::{Dot, Export, SVG};
 use graph::export::svg::Point;
+use tera::ast::ExprVal::Array;
 
-struct Boundingbox {
-    min_lat: f64,
-    max_lat: f64,
-    min_lon: f64,
-    max_lon: f64,
+fn find_contractable_nodes(neighbors: &HashMap<OsmId, Vec<OsmId>>,
+                           inv_neighbors: &HashMap<OsmId, Vec<OsmId>>,
+                           replacement_map: &mut HashMap<OsmId, OsmId>,
+                           circle_nodes: &mut HashSet<OsmId>) -> bool {
+    let mut changed = false;
+
+    let mut change_count = 0;
+    for (&nid, neighbor_nodes) in neighbors.iter() {
+        let start_node = nid;
+        let maxits = 500;
+
+        if neighbor_nodes.len() == 1 && inv_neighbors[&nid].len() == 1 {
+            let mut replacement = neighbor_nodes[0];
+            let mut counter = 0;
+
+            // we iterate as deeply, as our replacement map allows
+            while replacement_map.contains_key(&replacement) && counter < maxits {
+                replacement = replacement_map[&replacement];
+
+                // if we find a new circle we add all its nodes to the circlenodes
+                if replacement == start_node && !circle_nodes.contains(&replacement) {
+                    println!("circle detected for node {:?}", replacement);
+
+                    replacement = neighbor_nodes[0];
+                    while replacement != start_node {
+                        print!(" {:?} to", replacement);
+                        circle_nodes.insert(replacement);
+                        replacement = replacement_map[&replacement];
+                    }
+                    println!();
+                    circle_nodes.insert(replacement);
+                    changed = true;
+                    change_count += 1;
+                    break
+                }
+                counter += 1;
+            }
+
+            // only insert the replacment if it is actually a new discovery
+            if !replacement_map.contains_key(&nid) || replacement_map[&nid] != replacement {
+                replacement_map.insert(nid, replacement);
+                changed = true;
+                change_count += 1;
+            }
+
+        // if the node is part of a 2-way-path we can still contract it to the one it goes to
+        } else if neighbor_nodes.len() == 2 {
+            let mut oid = nid;
+            for nid in neighbor_nodes {
+                for iid in inv_neighbors[nid].iter() {
+                    if iid == &start_node {
+                        oid = *iid;
+                    }
+                }
+            }
+            // oid has changed, so it is part of such a 2-way situation
+            if oid != nid {
+                replacement_map.insert(nid, oid);
+            }
+        }
+    }
+    println!("\t{:?} nodes have changed in replacement map", change_count);
+    return changed;
 }
 
-fn in_boundingbox(node: &Node, boundingbox: &Boundingbox) -> bool {
-    node.lat() >= boundingbox.min_lat &&
-    node.lat() <= boundingbox.max_lat &&
-    node.lon() >= boundingbox.min_lon &&
-    node.lon() <= boundingbox.max_lon
+fn contract_nodes(nodes: &mut HashMap<OsmId, OsmObj>,
+                  neighbors: &mut HashMap<OsmId, Vec<OsmId>>,
+                  inv_neighbors: HashMap<OsmId, Vec<OsmId>>) {
+    let mut replacement_map: HashMap<OsmId, OsmId> = HashMap::new();
+    let mut circle_nodes = HashSet::<OsmId>::new();
+    let mut changed = true;
+    // find replacements as long, as the replacement map keeps changing
+    let mut i = 0;
+    while changed {
+        println!("contraction iteration {:?} with {:?} nodes to replace", i, replacement_map.len());
+        changed = find_contractable_nodes(neighbors, &inv_neighbors, &mut replacement_map, &mut circle_nodes); // assignment with side effects == very bad style
+        i += 1;
+    }
 
+    // remove the nodes which only form a circle
+    // which is not connected to the rest of the graph in any way.
+    for node in &circle_nodes {
+        nodes.remove(node);
+        neighbors.remove(node);
+        replacement_map.remove(node);
+    }
+
+    // replace all occurences of a node with the specified replacement node from the map
+    for (_, neighbor_nodes) in neighbors.iter_mut() {
+        for node in neighbor_nodes.iter_mut() {
+            if let Some(x) = replacement_map.get(node) {
+                *node = *x;
+            }
+        }
+    }
+
+    // remove all nodes which got replaced
+    for (from, _) in replacement_map.iter() {
+        neighbors.remove(from);
+        nodes.remove(from);
+    }
+
+    println!("The replacement map contains {} items after removing {:?} nodes in a circle", replacement_map.len(), circle_nodes.len());
 }
 
 fn main() -> std::io::Result<()> {
-    // let nw_gen = || 1;
-    // let ew_gen = || 2;
-    // let gen = Grid::new((2, 2), &nw_gen, &ew_gen);
-    // let grid = gen.generate();
-    // println!("{}", Dot::from_usize_weighted_graph(grid.as_ref(), "test"));
-
-    let mut pbf = OsmPbfReader::new(File::open("res/sachsen-latest.osm.pbf")?);
-    // let filter = ["primary", "secondary", "tertiary", "residential"];
-    let filter = ["motorway", "trunk", "primary",
-        "secondary", "tertiary", "unclassified",
-        "residential", "motorway_link", "trunk_link",
-        "primary_link", "secondary_link", "tertiary_link", "living_street"];
-    // let boundingbox = Boundingbox {
-    //     min_lat: 51.2937,
-    //     max_lat: 51.3888,
-    //     min_lon: 12.3042,
-    //     max_lon: 12.4704
-    // };
-    let boundingbox = Boundingbox {
-        min_lat: 8.5,
-        max_lat: 8.7,
-        min_lon: 53.35,
-        max_lon: 53.5
-    };
-
-
-    // let objs = pbf.iter()
-    //     .map(|obj| obj.unwrap())
-    //     .filter(|obj| {
-    //         obj.is_way() &&
-    //         filter.iter().any(|&key| obj.tags().contains("highway", key)) ||
-    //         // or it is a node that fits the given boundingbox
-    //         obj.node().map_or(false, |node| in_boundingbox(node, &boundingbox))
-    //     })
-    //     .collect();
-
-    let nodes = pbf.get_objs_and_deps(|obj| obj.node().map_or(false, |node| in_boundingbox(node, &boundingbox))).unwrap();
-    // let mut needed_nodes = BTreeMap::<OsmId, OsmObj>::new();
-    // let mut pbf = OsmPbfReader::new(File::open("res/sachsen-latest.osm.pbf")?);
-    // for obj in pbf.iter() {
-    //     let obj = obj.unwrap();
-    //     if obj.is_way() && filter.iter().any(|&key| obj.tags().contains("highway", key)) {
-    //         for &nid in obj.way().unwrap().nodes.iter() {
-    //             let key = OsmId::Node(nid);
-    //             if nodes.contains_key(&key) && !needed_nodes.contains_key(&key) {
-    //                 needed_nodes.insert(key, nodes[&key].clone());
-    //             }
-    //         }
-    //     }
-    // }
-
+    let mut pbf = OsmPbfReader::new(File::open("res/Leipzig_rough_center.osm.pbf")?);
     let mut neighbors = HashMap::<OsmId, Vec<OsmId>>::new();
-    let mut pbf = OsmPbfReader::new(File::open("res/bremen-latest.osm.pbf")?);
+    let mut inv_neighbors = HashMap::<OsmId, Vec<OsmId>>::new();
+    let mut nodes = HashMap::<OsmId, OsmObj>::new();
+    // read all nodes from the pbf to their respective lists.
+    // neighbors contain all successors of a node while inv_neighbors contains its predecessors.
     for obj in pbf.iter() {
         let obj = obj.unwrap();
-        if obj.is_way() && filter.iter().any(|&key| obj.tags().contains("highway", key)) {
+        if obj.is_node() {
+            nodes.insert(obj.id(), obj);
+        }
+        else if obj.is_way() {
             let mut pid = NodeId(0);
             for (i, &nid) in obj.way().unwrap().nodes.iter().enumerate() {
                 if i > 0 {
-                    let key = OsmId::Node(nid);
-                    // insert all the neighbors of a node into the hashmap, creating a new vec of neighbors, if there wasnt one before
-                    if nodes.contains_key(&key) {
-                        if neighbors.contains_key(&key) {
-                            neighbors.get_mut(&key).unwrap().push(OsmId::Node(pid))
-                        } else {
-                            neighbors.insert(key, [OsmId::Node(pid)].to_vec());
-                        }
+                    let n_key = OsmId::Node(nid);
+                    let p_key = OsmId::Node(pid);
+                    // insert all the predecessors of a node into the hashmap,
+                    // creating a new vec of neighbors, if there wasnt one before
+                    if inv_neighbors.contains_key(&n_key) {
+                        inv_neighbors.get_mut(&n_key).unwrap().push(p_key);
+                    } else {
+                        inv_neighbors.insert(n_key, [p_key].to_vec());
+                    }
+
+                    // insert all the successors of a node into the hashmap,
+                    // creating a new vec of neighbors, if there wasnt one before
+                    if neighbors.contains_key(&p_key) {
+                        neighbors.get_mut(&p_key).unwrap().push(n_key);
+                    } else {
+                        neighbors.insert(p_key, [n_key].to_vec());
                     }
                 }
                 pid = nid;
@@ -100,34 +157,38 @@ fn main() -> std::io::Result<()> {
         }
     }
 
-    let mut neighbors_clone = neighbors.clone();
-    for (nid, neighbor_nodes) in neighbors_clone.iter() {
-        if neighbor_nodes.len() == 1 {
-            for (id, oneighbors) in neighbors_clone.iter() {
-                if oneighbors.contains(nid) && neighbors.contains_key(id) {
-                    // replace the node with its successor
-                    neighbors.get_mut(id).unwrap().retain(|oid| oid != nid);
-                    neighbors.get_mut(id).unwrap().push(neighbor_nodes[0]);
-                }
-            }
-
-            // this node is no longer needed
-            neighbors.remove(nid);
+    for (id, _) in &nodes {
+        if !neighbors.contains_key(id) {
+            neighbors.insert(*id, [].to_vec());
+        }
+        if !inv_neighbors.contains_key(id) {
+            inv_neighbors.insert(*id, [].to_vec());
         }
     }
 
-    print!("We need {} nodes", neighbors.len());
+    // for (_, ids) in &neighbors {
+    //     for id in ids {
+    //         if !nodes.contains_key(id) {
+    //             println!("nodes does not have id {:?}", id);
+    //         }
+    //     }
+    // }
+
+    println!("Number of neighbors is {:?} with {:?} nodes.", neighbors.len(), nodes.len());
+
+    contract_nodes(&mut nodes, &mut neighbors, inv_neighbors);
 
     // Map node ids from osm to consecutive ids starting at 0
     let mut node_map: HashMap<OsmId, usize> = HashMap::new();
     let mut counter = 0;
-    for (id, _) in &neighbors {
-        let obj = &nodes[id];
-        if obj.is_node() {
+    for (id, _) in &nodes {
+        if !node_map.contains_key(id) {
             node_map.insert(*id, counter);
             counter += 1;
         }
     }
+
+    println!("We have {} mapped nodes and {} nodes", node_map.len(), nodes.len());
 
     let mut mapped_graph = MatrixGraph::<(Point, usize), usize>::with_size(counter);
 
@@ -138,40 +199,20 @@ fn main() -> std::io::Result<()> {
             x: obj.node().unwrap().lat(),
             y: obj.node().unwrap().lon()
         };
-        mapped_graph.add_node(i, (pos, 1)).ok();
+        mapped_graph.add_node(i, (pos, 1));
     }
 
-    // let mut pbf = OsmPbfReader::new(File::open("res/sachsen-latest.osm.pbf")?);
-    // // Insert edges into the graph with fixed weight 1
-    // for obj in pbf.iter() {
-    //     let obj = obj.unwrap();
-    //     if obj.is_way() {
-    //         let mut prev_id = 0;
-    //         for (i, node) in obj.way().unwrap().nodes.iter().enumerate() {
-    //             let new_id = node_map[node];
-    //             if i != 0 {
-    //                 match mapped_graph.add_edge((prev_id, new_id), 1) {
-    //                     _ => {}
-    //                 }
-    //             }
-    //             prev_id = new_id;
-    //         }
-    //     }
-    // }
-
-    for (nid, neighbor_nodes) in neighbors.iter() {
-        for neighbor in neighbor_nodes {
-            mapped_graph.add_edge((node_map[nid], node_map[neighbor]), 1).ok();
+    for (from_id, neighbor_nodes) in neighbors.iter() {
+        for to_id in neighbor_nodes {
+            if node_map.contains_key(from_id) && node_map.contains_key(to_id) && from_id != to_id {
+                mapped_graph.add_edge((node_map[from_id], node_map[to_id]), 1);
+            }
         }
     }
 
-    // println!("{:?}", mapped_graph.nodes());
-    // for node in mapped_graph.nodes() {
-    //     println!("\t{:?}", mapped_graph.node_weight(node));
-    // }
-
     println!("{:?}", mapped_graph.edges());
     println!("{:?}", mapped_graph.size());
+    println!("{:?}", mapped_graph.nodes());
     println!("{:?}\n", mapped_graph.order());
 
     let svg_exporter = SVG {
@@ -181,6 +222,8 @@ fn main() -> std::io::Result<()> {
     };
 
     // println!("{}", svg_exporter.from_coordinate_graph(&mapped_graph as &dyn WeightedGraph<(Point, usize), usize>, "Leipzig"));
+    let mut out_file = File::create("graph_out.svg").expect("Error creating file");
+    out_file.write_all(svg_exporter.from_coordinate_graph(&mapped_graph as &dyn WeightedGraph<(Point, usize), usize>, "Leipzig").as_bytes()).expect("Error writing to file");
 
     Ok(())
 }

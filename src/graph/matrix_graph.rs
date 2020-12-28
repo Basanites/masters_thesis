@@ -2,7 +2,7 @@ use super::{ Graph, WeightedGraph, Edge, GraphError };
 
 #[derive(Debug, PartialEq)]
 pub struct MatrixGraph<Nw, Ew> {
-    adjacency_matrix: Vec<Vec<Option<Ew>>>,
+    pub adjacency_matrix: Vec<Vec<Option<Ew>>>,
     node_weights: Vec<Option<Nw>>,
     order: usize,
     size: usize,
@@ -150,18 +150,18 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
     fn add_node(&mut self, id:usize, weight: Nw) -> Result<(), GraphError> {
         if self.node_weights.len() > id && self.has_node(id) {
             return Err(GraphError::DuplicateNode(id))
+        } else if self.node_weights.len() < id {
+            // Resizing here will never shrink the array, because has_node() implies id >= node_weights.len().
+            // However calling this every time is slower than checking if the array needs to be resized.
+            // Possible empty spots in between will be initialized with None.
+            self.node_weights.resize_with(id + 1, || None);
+            self.adjacency_matrix.resize_with(id + 1, || vec![None; id]);
+            for edge_weights in self.adjacency_matrix.iter_mut() {
+                edge_weights.resize_with(id + 1, || None);
+            }
         }
 
-        // Resizing here will never shrink the array, because has_node() implies id >= node_weights.len().
-        // Possible empty spots in between will be initialized with None.
-        self.node_weights.resize_with(id + 1, || None);
         self.node_weights[id] = Some(weight);
-
-        self.adjacency_matrix.resize_with(id + 1, || vec![None; id]);
-        for edge_weights in self.adjacency_matrix.iter_mut() {
-            edge_weights.resize_with(id + 1, || None);
-        }
-
         // Adding a node increases order by one.
         self.order += 1;
         Ok(())
