@@ -1,6 +1,8 @@
 mod graph;
 mod error;
 mod matrix_graph;
+
+pub mod import;
 pub mod export;
 pub mod generate;
 
