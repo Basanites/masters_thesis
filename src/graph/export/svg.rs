@@ -1,17 +1,11 @@
 use super::super::WeightedGraph;
 use super::Export;
+use crate::util::Point;
 
 use tera::Context;
 use tera::Tera;
-use serde::{Serialize, Deserialize};
 use std::fs::File;
 use std::io::prelude::*;
-
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-pub struct Point {
-    pub x: f64,
-    pub y: f64,
-}
 
 pub struct SVG {
     pub width: usize,
@@ -27,7 +21,7 @@ impl SVG {
         }
     }
 
-    pub fn from_coordinate_graph<Nw, Ew>(&self, graph: &dyn WeightedGraph<(Point, Nw), Ew>, name: &str) -> String {
+    pub fn export_coordinate_graph<Nw, Ew>(&self, graph: &dyn WeightedGraph<(Point, Nw), Ew>, name: &str) -> String {
         let mut context = Context::new();
 
         context.insert("name", &name);

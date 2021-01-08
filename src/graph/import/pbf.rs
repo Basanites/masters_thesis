@@ -4,8 +4,8 @@ use osmpbfreader::objects::Node;
 use osmpbfreader::{OsmId, OsmObj, NodeId};
 use std::collections::{HashMap, HashSet};
 
-use super::super::{MatrixGraph, WeightedGraph};
-use super::super::export::svg::Point;
+use super::super::{MatrixGraph, GenericWeightedGraph, WeightedGraph};
+use crate::util::Point;
 use crate::geo::{GeoPoint, geodistance_haversine};
 
 /// Calculates the distance between two nodes in km.
@@ -87,7 +87,7 @@ fn find_contractable_nodes(neighbors: &HashMap<OsmId, HashMap<OsmId, HashMap<Str
                 if replacement == start_node && !circle_nodes.contains(&replacement) {
                     println!("circle detected for node {:?}", replacement);
 
-                    let mut new_replacement_pair = neighbor_nodes.iter().last().unwrap();
+                    let new_replacement_pair = neighbor_nodes.iter().last().unwrap();
                     let mut replacement = new_replacement_pair.0;
                     while *replacement != start_node {
                         print!(" {:?} to", replacement);

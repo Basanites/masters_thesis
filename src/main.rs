@@ -3,12 +3,13 @@ use std::io::Write;
 use osmpbfreader::OsmPbfReader;
 
 mod graph;
-use graph::{WeightedGraph};
+use graph::{GenericWeightedGraph, WeightedGraph};
 use graph::export::{SVG};
-use graph::export::svg::Point;
 use graph::import::import_pbf;
 mod geo;
 use geo::GeoPoint;
+mod util;
+use util::Point;
 
 
 
@@ -31,7 +32,7 @@ fn main() -> std::io::Result<()> {
 
     // println!("{}", svg_exporter.from_coordinate_graph(&mapped_graph as &dyn WeightedGraph<(Point, usize), usize>, "Leipzig"));
     let mut out_file = File::create("graph_out.svg").expect("Error creating file");
-    out_file.write_all(svg_exporter.from_coordinate_graph(&mapped_graph as &dyn WeightedGraph<(Point, usize), f64>, "Leipzig").as_bytes()).expect("Error writing to file");
+    out_file.write_all(svg_exporter.export_coordinate_graph(&mapped_graph as &dyn WeightedGraph<(Point, usize), f64>, "Leipzig").as_bytes()).expect("Error writing to file");
 
     Ok(())
 }
