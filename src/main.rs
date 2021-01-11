@@ -1,6 +1,7 @@
+#![feature(test)]
+
 use std::fs::File;
 use std::io::Write;
-use osmpbfreader::OsmPbfReader;
 
 mod graph;
 use graph::{GenericWeightedGraph, WeightedGraph};
@@ -20,8 +21,8 @@ fn main() -> std::io::Result<()> {
     // println!("{:?}", mapped_graph.size());
     // println!("{:?}", mapped_graph.nodes());
     // println!("{:?}\n", mapped_graph.order());
-    for edge in mapped_graph.edges().iter() {
-       println!("Edge {:?} takes {:?} minutes", edge, mapped_graph.edge_weight(*edge).unwrap());
+    for edge in mapped_graph.edge_ids() {
+       println!("Edge {:?} takes {:?} minutes", edge, mapped_graph.edge_weight(edge).unwrap());
     }
 
     let svg_exporter = SVG {

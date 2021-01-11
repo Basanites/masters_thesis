@@ -4,7 +4,7 @@ use osmpbfreader::objects::Node;
 use osmpbfreader::{OsmId, OsmObj, NodeId};
 use std::collections::{HashMap, HashSet};
 
-use super::super::{MatrixGraph, GenericWeightedGraph, WeightedGraph};
+use super::super::{MatrixGraph, GenericWeightedGraph};
 use crate::util::Point;
 use crate::geo::{GeoPoint, geodistance_haversine};
 
@@ -228,7 +228,7 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
                     // println!("distance between {:?} and {:?} is {:?}km", p_node, n_node, distance);
 
                     if neighbors.contains_key(&p_key) {
-                        let mut neighbor_dists = neighbors.get_mut(&p_key).unwrap();
+                        let neighbor_dists = neighbors.get_mut(&p_key).unwrap();
                         if neighbor_dists.contains_key(&n_key) {
                             neighbor_dists.get_mut(&n_key).unwrap().insert(road_type, distance);
                         } else {
@@ -281,14 +281,16 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
             x: obj.node().unwrap().lat(),
             y: obj.node().unwrap().lon()
         };
-        mapped_graph.add_node(i, (pos, 1));
+        // TODO: when logger is here, log this to errorlog
+        let _ = mapped_graph.add_node(i, (pos, 1));
     }
 
     // Insert edges with their weight being the traveltime between each other.
     for (from_id, neighbor_nodes) in neighbors.iter() {
         for (to_id, dist_map) in neighbor_nodes {
             if node_map.contains_key(from_id) && node_map.contains_key(to_id) && from_id != to_id {
-                mapped_graph.add_edge((node_map[from_id], node_map[to_id]), traveltime_from_distance_map(dist_map));
+                // TODO: when logger is here this needs to go to errorlog
+                let _ = mapped_graph.add_edge((node_map[from_id], node_map[to_id]), traveltime_from_distance_map(dist_map));
             }
         }
     }

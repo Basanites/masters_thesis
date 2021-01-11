@@ -1,5 +1,4 @@
 use super::super::WeightedGraph;
-use super::Export;
 use crate::util::Point;
 
 use tera::Context;
@@ -29,10 +28,14 @@ impl SVG {
         context.insert("height", &self.height);
         context.insert("padding", &self.padding);
 
-        let extremes = graph.nodes()
-            .iter()
-            .map(|&id| graph.node_weight(id).unwrap().0)
-            .fold((0., 0., f64::MAX, f64::MAX), |acc, point| (f64::max(acc.0, point.x), f64::max(acc.1, point.y), f64::min(acc.2, point.x), f64::min(acc.3, point.y)));
+        let extremes = graph.iter_nodes()
+            .map(|(_, weight)| weight.0)
+            .fold((0., 0., f64::MAX, f64::MAX), |acc, point| {
+                (f64::max(acc.0, point.x),
+                 f64::max(acc.1, point.y),
+                 f64::min(acc.2, point.x),
+                 f64::min(acc.3, point.y))
+            });
 
         // let nodes: Vec<(Point, &str)> = graph.nodes()
         //     .iter()
@@ -40,11 +43,10 @@ impl SVG {
         //     .collect();
         let nodes = Vec::<(Point, &str)>::new();
 
-        let paths: Vec<(String, &str)> = graph.edges()
-            .iter()
-            .map(|&(f_id, t_id)| {
-                let p1 = self.scaled_point(&graph.node_weight(f_id).unwrap().0, extremes.0, extremes.1, extremes.2, extremes.3);
-                let p2 = self.scaled_point(&graph.node_weight(t_id).unwrap().0, extremes.0, extremes.1, extremes.2, extremes.3);
+        let paths: Vec<(String, &str)> = graph.iter_edge_ids()
+            .map(|(f_id, t_id)| {
+                let p1 = self.scaled_point(&graph.node_weight(f_id.clone()).unwrap().0, extremes.0, extremes.1, extremes.2, extremes.3);
+                let p2 = self.scaled_point(&graph.node_weight(t_id.clone()).unwrap().0, extremes.0, extremes.1, extremes.2, extremes.3);
                 (format!("M {} {} L {} {}", p1.x, p1.y, p2.x, p2.y), "black")
             })
             .collect();

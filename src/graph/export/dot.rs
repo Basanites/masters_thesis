@@ -12,17 +12,11 @@ impl Export for Dot {
     fn from_weighted_graph<Nw: Display, Ew: Display>(graph: &dyn WeightedGraph<Nw, Ew>, name: &str) -> String {
         let mut out = String::from(format!("digraph {} {{\n", name));
 
-        for node in graph.nodes() {
-            // This can never panic, because nodes only gets the nodes with a weight attached.
-            let weight = graph.node_weight(node).unwrap();
-
+        for (node, weight) in graph.iter_nodes() {
             out.push_str(format!("\t{} [label=\"{}\"]\n", node, weight).as_str());
         }
 
-        for edge in graph.edges() {
-            // This can never panic, because edges only gets the edges with a weight attached.
-            let weight = graph.edge_weight(edge).unwrap();
-
+        for (edge, weight) in graph.iter_edges() {
             out.push_str(format!("\t{} -> {} [label=\"{}\"]\n", edge.0, edge.1, weight).as_str());
         }
 
@@ -37,25 +31,19 @@ impl Export for Dot {
     fn from_usize_weighted_graph(graph: &dyn WeightedGraph<usize, usize>, name: &str) -> String {
         let mut out = String::from(format!("digraph {} {{\n", name));
 
-        for node in graph.nodes() {
-            // This can never panic, because nodes only gets the nodes with a weight attached.
-            let weight = graph.node_weight(node).unwrap();
-
+        for (node, weight) in graph.iter_nodes() {
             out.push_str(format!("\t{} [label=\"{}\"]\n", node, weight).as_str());
         }
 
         let mut max_len = 1;
-        for edge in graph.edges() {
-            // This can never panic, because edges only gets the edges with a weight attached.
-            let weight = graph.edge_weight(edge).unwrap();
+        for (_, weight) in graph.iter_edges() {
             if weight > &max_len {
                 max_len = weight.clone();
             }
         }
 
-        for edge in graph.edges() {
-            // This can never panic, because edges only gets the edges with a weight attached.
-            let weight = graph.edge_weight(edge).unwrap().clone() as f64;
+        for (edge, weight) in graph.iter_edges() {
+            let weight = *weight as f64;
 
             out.push_str(format!("\t{} -> {} [weight={} label={}]\n", edge.0, edge.1, max_len as f64 / weight, weight).as_str());
         }
