@@ -1,3 +1,4 @@
+#![allow(clippy::map_entry)]
 use std::fs::File;
 use osmpbfreader::OsmPbfReader;
 use osmpbfreader::objects::Node;
@@ -30,7 +31,7 @@ fn traveltime_from_distance_map(dist_map: &HashMap<String, f64>) -> f64 {
                 _ => 0.5 // if we don't know the street type we just assume 50km/h
             };
             // we need to multiply by 60 to get to minutes
-            return val * factor * 60.0
+            val * factor * 60.0
         })
         .sum()
 }
@@ -54,7 +55,7 @@ fn get_node_replacement (replacement_map: &HashMap<OsmId, (OsmId, HashMap<String
             updated_dist_map.insert(key.into(), other_dist_map[key]);
         }
     }
-    return (replacement_pair.0, updated_dist_map)
+    (replacement_pair.0, updated_dist_map)
 }
 
 /// Finds all nodes which are on a path with just a single connection and
@@ -73,15 +74,15 @@ fn find_contractable_nodes(neighbors: &HashMap<OsmId, HashMap<OsmId, HashMap<Str
 
         if neighbor_nodes.len() == 1 && inv_neighbors[&nid].len() == 1 {
             let replacement_pair = neighbor_nodes.iter().last().unwrap();
-            let mut replacement = replacement_pair.0.clone();
+            let mut replacement = *replacement_pair.0;
             let mut dist_map = replacement_pair.1.clone();
             let mut counter = 0;
 
             // we iterate as deeply, as our replacement map allows
             while replacement_map.contains_key(&replacement) && counter < maxits {
                 let new_replacement_pair = get_node_replacement(&replacement_map, replacement, dist_map.clone());
-                replacement = new_replacement_pair.0.clone();
-                dist_map = new_replacement_pair.1.clone();
+                replacement = new_replacement_pair.0;
+                dist_map = new_replacement_pair.1;
 
                 // if we find a new circle we add all its nodes to the circle_nodes
                 if replacement == start_node && !circle_nodes.contains(&replacement) {
@@ -127,7 +128,7 @@ fn find_contractable_nodes(neighbors: &HashMap<OsmId, HashMap<OsmId, HashMap<Str
         // }
     }
     println!("\t{:?} nodes have changed in replacement map", change_count);
-    return changed;
+    changed
 }
 
 /// Contracts all nodes on a single connection path into one endpoint node.
@@ -250,7 +251,7 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
     }
 
     // initialize all nodes, which were in the nodes array but never appeared in a way
-    for (id, _) in &nodes {
+    for id in nodes.keys() {
         if !neighbors.contains_key(id) {
             neighbors.insert(*id, HashMap::new());
         }
@@ -265,7 +266,7 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
     // Map node ids from osm to consecutive ids starting at 0
     let mut node_map: HashMap<OsmId, usize> = HashMap::new();
     let mut counter = 0;
-    for (id, _) in &nodes {
+    for id in nodes.keys() {
         if !node_map.contains_key(id) {
             node_map.insert(*id, counter);
             counter += 1;
@@ -295,5 +296,5 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
         }
     }
 
-    return mapped_graph;
+    mapped_graph
 }

@@ -1,4 +1,13 @@
-pub use super::{ GraphError };
+mod error;
+mod matrix_graph;
+mod geo_graph;
+
+pub mod import;
+pub mod export;
+pub mod generate;
+
+pub use error::{ GraphError };
+pub use matrix_graph::MatrixGraph;
 
 pub type Edge<IndexType> = (IndexType, IndexType);
 
@@ -85,6 +94,8 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
 
 }
 
+pub trait WeightedGraph<Nw, Ew> : GenericWeightedGraph<usize, Nw, Ew> {}
+
 pub trait GenericGraph<IndexType> {
     /// Returns true if there are no nodes, or false otherwise.
     fn is_empty(&self) -> bool;
@@ -143,5 +154,3 @@ pub trait GenericGraph<IndexType> {
 }
 
 pub trait Graph : GenericGraph<usize> {}
-
-pub trait WeightedGraph<Nw, Ew> : GenericWeightedGraph<usize, Nw, Ew> {}

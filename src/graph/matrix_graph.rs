@@ -22,7 +22,7 @@ impl<Nw: Clone, Ew: Clone> MatrixGraph<Nw, Ew> {
             // The initialization of adjacency_matrix makes it necessary, that Ew is of type Clone.
             // If that can be fixed Ew won't need to be Clone.
             adjacency_matrix: (0..node_amount).map(|_| vec![None; node_amount]).collect(),
-            node_weights: nodes.into_iter().map(|node| Some(node)).collect(),
+            node_weights: nodes.into_iter().map(Some).collect(),
             order: node_amount,
             size: edges.len()
         };
@@ -76,14 +76,14 @@ impl MatrixGraph<(), ()> {
         };
 
         // A lot of places where to_owned is used. Could possibly be simplified.
-        for (from, to) in edges.into_iter() {
+        for (from, to) in edges.iter() {
             if from >= &nodes {
-                return Err(GraphError::MissingNode(from.to_owned()))
+                return Err(GraphError::MissingNode(*from))
             } else if to >= &nodes {
-                return Err(GraphError::MissingNode(to.to_owned()))
+                return Err(GraphError::MissingNode(*to))
             } 
 
-            graph.adjacency_matrix[from.to_owned()][to.to_owned()] = Some(());
+            graph.adjacency_matrix[*from][*to] = Some(());
         }
 
         Ok(graph)
