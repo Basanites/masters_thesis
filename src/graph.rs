@@ -1,13 +1,13 @@
 mod error;
-mod matrix_graph;
-mod geo_graph;
 
 pub mod import;
 pub mod export;
 pub mod generate;
+pub mod regular;
+pub mod geo;
 
 pub use error::{ GraphError };
-pub use matrix_graph::MatrixGraph;
+use crate::geo::GeoPoint;
 
 pub type Edge<IndexType> = (IndexType, IndexType);
 
@@ -25,7 +25,7 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
     fn iter_node_ids(&self) -> Box<dyn Iterator<Item = IndexType> + '_>;
 
     /// Returns the node ids of this graph.
-    fn node_ids(&self) -> Vec<usize>;
+    fn node_ids(&self) -> Vec<IndexType>;
 
     /// Returns an iterator over the node ids and a reference to their weight.
     fn iter_nodes(&self) -> Box<dyn Iterator<Item = (IndexType, &Nw)> + '_>;
@@ -62,7 +62,7 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
 
     /// Returns the count of neighbors at node with given id.
     /// Returns an error if the node is not in the graph.
-    fn degree(&self, id: IndexType) -> Result<IndexType, GraphError>;
+    fn degree(&self, id: IndexType) -> Result<usize, GraphError>;
 
     /// Returns an iterator over edge ids in the form (from_id, to_id)
     fn iter_edge_ids(&self) -> Box<dyn Iterator<Item = Edge<IndexType>> + '_>;
@@ -95,6 +95,8 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
 }
 
 pub trait WeightedGraph<Nw, Ew> : GenericWeightedGraph<usize, Nw, Ew> {}
+
+pub trait GeoGraph<Nw, Ew> : GenericWeightedGraph<GeoPoint, Nw, Ew> {}
 
 pub trait GenericGraph<IndexType> {
     /// Returns true if there are no nodes, or false otherwise.

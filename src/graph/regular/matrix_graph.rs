@@ -1,4 +1,4 @@
-use super::{ GenericWeightedGraph, WeightedGraph, Edge, GraphError };
+use crate::graph::{ GenericWeightedGraph, WeightedGraph, Edge, GraphError };
 
 #[derive(Debug, PartialEq)]
 pub struct MatrixGraph<Nw, Ew> {

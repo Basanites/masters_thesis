@@ -1,4 +1,4 @@
-use super::super::WeightedGraph;
+use crate::graph::WeightedGraph;
 use super::Export;
 use std::fmt::Display;
 

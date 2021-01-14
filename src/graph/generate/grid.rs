@@ -1,5 +1,5 @@
 use super::Generate;
-use super::super::{GenericWeightedGraph, WeightedGraph, MatrixGraph};
+use crate::graph::{GenericWeightedGraph, WeightedGraph, regular::MatrixGraph};
 use std::marker::PhantomData;
 use std::collections::HashMap;
 

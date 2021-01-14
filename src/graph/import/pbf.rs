@@ -2,12 +2,12 @@
 use std::fs::File;
 use osmpbfreader::OsmPbfReader;
 use osmpbfreader::objects::Node;
-use osmpbfreader::{OsmId, OsmObj, NodeId};
-use std::collections::{HashMap, HashSet};
+use osmpbfreader::{ OsmId, OsmObj, NodeId };
+use std::collections::{ HashMap, HashSet };
 
-use super::super::{MatrixGraph, GenericWeightedGraph};
+use crate::graph::{ regular::MatrixGraph, GenericWeightedGraph };
 use crate::util::Point;
-use crate::geo::{GeoPoint, geodistance_haversine};
+use crate::geo::{ GeoPoint, geodistance_haversine };
 
 /// Calculates the distance between two nodes in km.
 fn get_node_distance(node_1: &Node, node_2: &Node) -> f64 {
