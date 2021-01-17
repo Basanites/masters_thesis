@@ -1,0 +1,27 @@
+<?xml version="1.0" standalone="no"?>
+<svg
+  width="100%"
+  height="100%"
+  viewBox="0 0 {{width + padding * 2}} {{height + padding * 2}}"
+  preserveAspectRatio="xMidYMid meet"
+  xmlns="http://www.w3.org/2000/svg"
+  >
+  <text 
+    x="{{width/2 + padding}}"
+    y="{{padding / 2}}"
+    font-family="-apple-system, system-ui, BlinkMacSystemFont, Roboto"
+    dominant-baseline="middle"
+    text-anchor="middle"
+    font-size="18"
+    fill="#74838f"
+    font-weight="700"
+    >
+    {{name}}
+  </text> 
+  {% for tuple in paths %}
+    <path stroke="{{tuple.1}}" stroke-linejoin="round" d="{{tuple.0}}" stroke-width="2.0" fill="none" />
+  {% endfor %} 
+  {% for tuple in points %}
+    <circle cx="{{tuple.0.x}}" cy="{{tuple.0.y}}" r="2.0" stroke="{{tuple.1}}" />
+  {% endfor %}
+</svg>
