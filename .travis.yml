@@ -6,4 +6,9 @@ cache:
 before_script:
   - rustup component add clippy
 script:
+  - cargo test
   - cargo clippy --lib -- -D warnings
+branches:
+  only:
+    - master
+    - stable
