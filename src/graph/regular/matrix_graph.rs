@@ -1,4 +1,4 @@
-use super::{ Graph, WeightedGraph, Edge, GraphError };
+use crate::graph::{ GenericWeightedGraph, WeightedGraph, Edge, GraphError };
 
 #[derive(Debug, PartialEq)]
 pub struct MatrixGraph<Nw, Ew> {
@@ -22,7 +22,7 @@ impl<Nw: Clone, Ew: Clone> MatrixGraph<Nw, Ew> {
             // The initialization of adjacency_matrix makes it necessary, that Ew is of type Clone.
             // If that can be fixed Ew won't need to be Clone.
             adjacency_matrix: (0..node_amount).map(|_| vec![None; node_amount]).collect(),
-            node_weights: nodes.into_iter().map(|node| Some(node)).collect(),
+            node_weights: nodes.into_iter().map(Some).collect(),
             order: node_amount,
             size: edges.len()
         };
@@ -66,7 +66,7 @@ impl<Nw: Clone, Ew: Clone> MatrixGraph<Nw, Ew> {
 #[allow(dead_code)]
 impl MatrixGraph<(), ()> {
     /// Constructs an unweighted MatrixGraph using the given amount of nodes and list of edges.
-    pub fn new_unweighted(nodes: usize, edges: &[Edge]) -> Result<Self, GraphError> {
+    pub fn new_unweighted(nodes: usize, edges: &[Edge<usize>]) -> Result<Self, GraphError> {
         // initialization works basically the same way as for generic types.
         let mut graph = MatrixGraph {
             adjacency_matrix: (0..nodes).map(|_| vec![None; nodes]).collect(),
@@ -76,14 +76,14 @@ impl MatrixGraph<(), ()> {
         };
 
         // A lot of places where to_owned is used. Could possibly be simplified.
-        for (from, to) in edges.into_iter() {
+        for (from, to) in edges.iter() {
             if from >= &nodes {
-                return Err(GraphError::MissingNode(from.to_owned()))
+                return Err(GraphError::MissingNode(*from))
             } else if to >= &nodes {
-                return Err(GraphError::MissingNode(to.to_owned()))
+                return Err(GraphError::MissingNode(*to))
             } 
 
-            graph.adjacency_matrix[from.to_owned()][to.to_owned()] = Some(());
+            graph.adjacency_matrix[*from][*to] = Some(());
         }
 
         Ok(graph)
@@ -100,7 +100,7 @@ impl MatrixGraph<(), ()> {
     }
 }
 
-impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
+impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<Nw, Ew> {
     fn is_empty(&self) -> bool {
         self.node_weights.is_empty()
     }
@@ -113,12 +113,22 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
         self.size
     }
 
-    fn nodes(&self) -> Vec<usize> {
-        self.node_weights.iter()
+    fn iter_node_ids(&self) -> Box<dyn Iterator<Item = usize> + '_> {
+        Box::new(self.node_weights.iter()
             .enumerate()
             .filter(|(_, x)| x.is_some())
-            .map(|(i, _)| i)
-            .collect()
+            .map(move |(i, _)| i))
+    }
+
+    fn node_ids(&self) -> Vec<usize> {
+        self.iter_node_ids().collect()
+    }
+
+    fn iter_nodes(&self) -> Box<dyn Iterator<Item = (usize, &Nw)> + '_> {
+        Box::new(self.node_weights.iter()
+            .enumerate()
+            .filter(|(_, x)| x.is_some())
+            .map(move |(i, _)| (i, self.node_weight(i).unwrap())))
     }
 
     fn node_weight(&self, id: usize) -> Result<&Nw, GraphError> {
@@ -130,17 +140,36 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
         Ok(self.node_weights[id].as_ref().unwrap())
     }
 
-    fn neighbors(&self, id: usize) -> Result<Vec<usize>, GraphError>{
+    fn iter_neighbor_ids(&self, id: usize) -> Result<Box<dyn Iterator<Item = usize> + '_>, GraphError> {
         if !self.has_node(id) {
             return Err(GraphError::MissingNode(id))
         }
 
         // Get the ids of nodes to which a weighted edge from id exists.
-        Ok(self.adjacency_matrix[id].iter()
+        Ok(Box::new(self.adjacency_matrix[id].iter()
+               .enumerate()
+               .filter(|(_, x)| x.is_some())
+               .map(move |(i, _)| i)))
+    }
+
+    fn neighbor_ids(&self, id: usize) -> Result<Vec<usize>, GraphError>{
+        match self.iter_neighbor_ids(id) {
+            Ok(iterator) => Ok(iterator.collect()),
+            Err(error) => Err(error)
+        }
+
+    }
+
+    fn iter_neighbors(&self, id: usize) -> Result<Box<dyn Iterator<Item = (usize, &Ew)> + '_>, GraphError> {
+        if !self.has_node(id) {
+            return Err(GraphError::MissingNode(id))
+        }
+
+        // Get the ids of nodes to which a weighted edge from id exists.
+        Ok(Box::new(self.adjacency_matrix[id].iter()
             .enumerate()
             .filter(|(_, x)| x.is_some())
-            .map(|(i, _)| i)
-            .collect())
+            .map(move |(i, _)| (i, self.edge_weight((id, i)).unwrap()))))
     }
 
     fn has_node(&self, id: usize) -> bool {
@@ -192,27 +221,37 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
 
     fn degree(&self, id: usize) -> Result<usize, GraphError> {
         // GraphError can be thrown if the node with id is not in the graph.
-        Ok(self.neighbors(id)?.len())
+        Ok(self.neighbor_ids(id)?.len())
     }
 
-    fn edges(&self) -> Vec<Edge> {
-        let mut out = Vec::new();
-
-        // Iterating over the whole matrix is really slow, if it needs to be called more often maybe cache?
-        // If you use a MatrixGraph you should already know, this operation will be slow.
-        for (i, edges) in self.adjacency_matrix.iter().enumerate() {
-            let mut pairs = edges.iter()
-                .enumerate()
-                .filter(|(_, weight)| weight.is_some())
-                .map(|(j, _)| (i, j))
-                .collect();
-            out.append(&mut pairs);
-        }
-
-        out
+    fn iter_edge_ids(&self) -> Box<dyn Iterator<Item = Edge<usize>> + '_> {
+        Box::new(self.adjacency_matrix.iter()
+            .enumerate()
+            .flat_map(|(i, edges)| {
+                edges.iter()
+                    .enumerate()
+                    .filter(|(_, weight)| weight.is_some())
+                    .map(move |(j, _)| (i, j))
+            }))
     }
 
-    fn edge_weight(&self, edge: Edge) -> Result<&Ew, GraphError> {
+    fn edge_ids(&self) -> Vec<Edge<usize>> {
+        self.iter_edge_ids().collect()
+    }
+
+    fn iter_edges(&self) -> Box<dyn Iterator<Item = (Edge<usize>, &Ew)> + '_> {
+        Box::new(self.adjacency_matrix.iter()
+            .enumerate()
+            .flat_map(move |(i, edges)| {
+                edges.iter()
+                    .enumerate()
+                    .filter(|(_, weight)| weight.is_some())
+                    .map(move |(j, _)| ((i, j), self.edge_weight((i, j)).unwrap()))
+            }))
+
+    }
+
+    fn edge_weight(&self, edge: Edge<usize>) -> Result<&Ew, GraphError> {
         let (start_node, end_node) = edge;
         if !self.has_edge(edge) {
             return Err(GraphError::MissingEdge(edge))
@@ -221,7 +260,7 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
         Ok(&self.adjacency_matrix[start_node][end_node].as_ref().unwrap())
     }
 
-    fn has_edge(&self, edge: Edge) -> bool {
+    fn has_edge(&self, edge: Edge<usize>) -> bool {
         let (start_node, end_node) = edge;
         if !self.has_node(start_node) || !self.has_node(end_node){
             return false
@@ -230,7 +269,7 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
         self.adjacency_matrix[start_node][end_node].is_some()
     }
 
-    fn add_edge(&mut self, edge: Edge, weight: Ew) -> Result<(), GraphError> {
+    fn add_edge(&mut self, edge: Edge<usize>, weight: Ew) -> Result<(), GraphError> {
         let (start_node, end_node) = edge;
         if self.has_edge(edge) {
             return Err(GraphError::DuplicateEdge(edge))
@@ -247,7 +286,7 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
         Ok(())
     }
 
-    fn remove_edge(&mut self, edge: Edge) {
+    fn remove_edge(&mut self, edge: Edge<usize>) {
         if self.has_edge(edge) {
             self.adjacency_matrix[edge.0][edge.1] = None;
             // Removing an edge reduces size by one.
@@ -255,7 +294,7 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
         }
     }
     
-    fn change_edge(&mut self, edge: Edge, weight: Ew) -> Result<(), GraphError> {
+    fn change_edge(&mut self, edge: Edge<usize>, weight: Ew) -> Result<(), GraphError> {
         if self.has_edge(edge) {
             self.adjacency_matrix[edge.0][edge.1] = Some(weight);
             Ok(())
@@ -265,63 +304,69 @@ impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {
     }
 }
 
-impl Graph for MatrixGraph<(), ()> {
-    fn is_empty(&self) -> bool {
-        <Self as WeightedGraph<(), ()>>::is_empty(self)
-    }
-    
-    fn order(&self) -> usize {
-        <Self as WeightedGraph<(), ()>>::order(self)
-    }
-    
-    fn size(&self) -> usize {
-        <Self as WeightedGraph<(), ()>>::size(self)
-    }
+impl<Nw: Clone, Ew: Clone> WeightedGraph<Nw, Ew> for MatrixGraph<Nw, Ew> {}
 
-    fn nodes(&self) -> Vec<usize> {
-        <Self as WeightedGraph<(), ()>>::nodes(self)
-    }
-
-    fn neighbors(&self, id: usize) -> Result<Vec<usize>, GraphError> {
-        <Self as WeightedGraph<(), ()>>::neighbors(self, id)
-    }
-
-    fn has_node(&self, id: usize) -> bool {
-        <Self as WeightedGraph<(), ()>>::has_node(self, id)
-    }
-
-    fn add_node(&mut self, id: usize) -> Result<(), GraphError> {
-        <Self as WeightedGraph<(), ()>>::add_node(self, id, ())
-    }
-
-    fn remove_node(&mut self, id: usize) {
-        <Self as WeightedGraph<(), ()>>::remove_node(self, id)
-    }
-
-    fn degree(&self, id: usize) -> Result<usize, GraphError> {
-        <Self as WeightedGraph<(), ()>>::degree(self, id)
-    }
-
-    fn edges(&self) -> Vec<Edge> {
-        <Self as WeightedGraph<(), ()>>::edges(self)
-    }
-
-    fn has_edge(&self, edge: Edge) -> bool {
-        <Self as WeightedGraph<(), ()>>::has_edge(self, edge)
-    }
-
-    fn add_edge(&mut self, edge: Edge) -> Result<(), GraphError> {
-        <Self as WeightedGraph<(), ()>>::add_edge(self, edge, ())
-    }
-
-    fn remove_edge(&mut self, edge: Edge) {
-        <Self as WeightedGraph<(), ()>>::remove_edge(self, edge)
-    }
-}
+// impl GenericGraph<usize> for MatrixGraph<(), ()> {
+//     fn is_empty(&self) -> bool {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::is_empty(self)
+//     }
+//
+//     fn order(&self) -> usize {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::order(self)
+//     }
+//
+//     fn size(&self) -> usize {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::size(self)
+//     }
+//
+//     fn nodes(&self) -> Vec<usize> {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::nodes(self)
+//     }
+//
+//     fn neighbors(&self, id: usize) -> Result<Vec<usize>, GraphError> {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::neighbors(self, id)
+//     }
+//
+//     fn has_node(&self, id: usize) -> bool {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::has_node(self, id)
+//     }
+//
+//     fn add_node(&mut self, id: usize) -> Result<(), GraphError> {
+//         <Self as GenericWeightedGraph<usize,(), ()>>::add_node(self, id, ())
+//     }
+//
+//     fn remove_node(&mut self, id: usize) {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::remove_node(self, id)
+//     }
+//
+//     fn degree(&self, id: usize) -> Result<usize, GraphError> {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::degree(self, id)
+//     }
+//
+//     fn edges(&self) -> Vec<Edge<usize>> {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::edges(self)
+//     }
+//
+//     fn has_edge(&self, edge: Edge<usize>) -> bool {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::has_edge(self, edge)
+//     }
+//
+//     fn add_edge(&mut self, edge: Edge<usize>) -> Result<(), GraphError> {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::add_edge(self, edge, ())
+//     }
+//
+//     fn remove_edge(&mut self, edge: Edge<usize>) {
+//         <Self as GenericWeightedGraph<usize, (), ()>>::remove_edge(self, edge)
+//     }
+// }
+//
+// impl Graph for MatrixGraph<(), ()> {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test::Bencher;
+    extern crate test;
 
     fn valid_weighted() -> MatrixGraph<usize, usize> {
         MatrixGraph::new(vec![1, 2, 3], vec![(0, 1, 100), (1, 2, 101), (2, 1, 50), (2, 0, 200)]).unwrap()
@@ -521,7 +566,7 @@ mod tests {
         assert_eq!(graph.order(), 2, "Order was updated incorrectly after removal.");
         assert_eq!(graph.size(), 1, "Size was updated incorrectly after removal.");
         assert_eq!(graph.nodes().sort(), vec![0, 2].sort(), "Nodelist was updated incorrectly after removal.");
-        assert_eq!(graph.edges().sort(), vec![(2, 0)].sort(), "Edgelist was updated incorrectly after removal.");
+        assert_eq!(graph.edge_ids().sort(), vec![(2, 0)].sort(), "Edgelist was updated incorrectly after removal.");
     }
 
     #[test]
@@ -545,8 +590,8 @@ mod tests {
         let graph = valid_weighted();
         let empty = MatrixGraph::<usize, usize>::default();
 
-        assert_eq!(graph.edges(), vec![(0,1), (1, 2), (2, 0), (2, 1)], "Edge list is wrong.");
-        assert_eq!(empty.edges(), vec![], "Edge list should be empty, since graph is empty.");
+        assert_eq!(graph.edge_ids(), vec![(0,1), (1, 2), (2, 0), (2, 1)], "Edge list is wrong.");
+        assert_eq!(empty.edge_ids(), vec![], "Edge list should be empty, since graph is empty.");
     }
 
     #[test]
@@ -612,5 +657,48 @@ mod tests {
 
         graph.remove_edge((0, 1));
         assert!(!graph.has_edge((0, 1)), "Multiple deletions insert the edge back.");
+    }
+
+    #[bench]
+    fn bench_iter_edge_ids(b: &mut Bencher) {
+        let graph = valid_weighted();
+
+        b.iter(|| {
+            let n = test::black_box(1);
+            valid_weighted().iter_edge_ids();
+        })
+    }
+
+    #[bench]
+    fn bench_iter_edges(b: &mut Bencher) {
+        let graph = valid_weighted();
+
+        b.iter(|| {
+            let n = test::black_box(1);
+            valid_weighted().iter_edges();
+        })
+    }
+
+    #[bench]
+    fn bench_edge_ids(b: &mut Bencher) {
+        let graph = valid_weighted();
+
+        b.iter(|| {
+            let n = test::black_box(1);
+            valid_weighted().edge_ids();
+        })
+    }
+
+    #[bench]
+    fn bench_sequential_weights(b: &mut Bencher) {
+        let graph = valid_weighted();
+
+        b.iter(|| {
+            let n = test::black_box(1);
+            let edges = valid_weighted().edge_ids();
+            for edge in edges {
+                valid_weighted().edge_weight(edge).unwrap();
+            }
+        })
     }
 }

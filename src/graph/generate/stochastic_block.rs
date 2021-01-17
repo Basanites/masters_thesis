@@ -1,5 +1,5 @@
 use super::Generate;
-use super::super::{WeightedGraph, MatrixGraph};
+use crate::graph::{GenericWeightedGraph, WeightedGraph, regular::MatrixGraph};
 
 use rand::{thread_rng, Rng};
 
