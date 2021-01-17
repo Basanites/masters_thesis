@@ -52,9 +52,9 @@ impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> TwoSwap<'a, 
 
     pub fn single_iteration(&mut self) -> Option<&Vec<Edge<IndexType>>> {
         let mut new_best = Vec::new();
-        let mut max = 0.0;
+        let mut max: f64;
         let mut score = 0.0;
-        let mut temp_score = 0.0;
+        let mut temp_score: f64;
         for (from, to) in self.best_solution.iter() {
             let t_weight = self.graph.node_weight(*to).unwrap();
             max = self.score(*t_weight, *self.graph.edge_weight((*from, *to)).unwrap());
@@ -63,7 +63,7 @@ impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> TwoSwap<'a, 
             for (nid, weight) in self.graph.iter_neighbors(*from).unwrap() {
                 temp_score = self.score_with_known_edge(nid, *weight);
                 if let Ok(return_weight) = self.graph.edge_weight((nid, *to)) {
-                    temp_score = temp_score + self.score(*t_weight, *return_weight);
+                    temp_score += self.score(*t_weight, *return_weight);
                     if temp_score > max {
                         max = temp_score;
                         best_follow = nid;
@@ -77,7 +77,7 @@ impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> TwoSwap<'a, 
             } else {
                 new_best.push((*from, *to));
             }
-            score = score + max;
+            score += max;
         }
 
         if score > self.best_score {

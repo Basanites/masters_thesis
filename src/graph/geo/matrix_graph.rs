@@ -38,7 +38,7 @@ impl<Nw: Copy, Ew: Copy> MatrixGraph<Nw, Ew> {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::map_entry)]
 impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<GeoPoint, Nw, Ew> for MatrixGraph<Nw, Ew> {
     fn is_empty(&self) -> bool {
         self.internal_graph.is_empty()
@@ -53,7 +53,7 @@ impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<GeoPoint, Nw, Ew> for MatrixGraph<
     }
 
     fn iter_node_ids(&self) -> Box<dyn Iterator<Item = GeoPoint> + '_> {
-        Box::new(self.node_map.keys().map(|point| *point))
+        Box::new(self.node_map.keys().copied())
     }
 
     fn node_ids(&self) -> Vec<GeoPoint> {
