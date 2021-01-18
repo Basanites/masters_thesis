@@ -296,5 +296,19 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
         }
     }
 
+    // Insert inverse edges with their weight being the traveltime between each other.
+    for (to_id, neighbor_nodes) in neighbors.iter() {
+        for (from_id, dist_map) in neighbor_nodes {
+            if node_map.contains_key(from_id) && node_map.contains_key(to_id) && from_id != to_id {
+                let m_fid = node_map[from_id];
+                let m_tid = node_map[to_id];
+                if !mapped_graph.has_edge((m_fid, m_tid)) {
+                    // TODO: when logger is here this needs to go to errorlog
+                    let _ = mapped_graph.add_edge((m_fid, m_tid), traveltime_from_distance_map(dist_map));
+                }
+            }
+        }
+    }
+
     mapped_graph
 }

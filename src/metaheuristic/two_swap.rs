@@ -1,16 +1,25 @@
 use crate::graph::{GenericWeightedGraph, Edge};
+use std::fmt::Debug;
+use std::cmp::{PartialEq, Eq};
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::ops::{Add, Sub};
 
-struct TwoSwap<'a, IndexType, Nw, Ew> {
+pub struct TwoSwap<'a, IndexType, Nw, Ew> {
     graph: Box<dyn GenericWeightedGraph<IndexType, Nw, Ew>>,
     goal_point: IndexType,
     max_time: Ew,
     evaluator: &'a fn(Nw, Ew) -> f64,
     best_solution: Vec<Edge<IndexType>>,
     best_score: f64,
+    best_length: Ew,
+    visited_nodes: HashMap<IndexType, bool>,
 }
 
-impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> TwoSwap<'a, IndexType, Nw, Ew> {
+impl<'a, IndexType: Copy + PartialEq + Debug + Hash + Eq, Nw: Copy, Ew: Copy + Add<Output = Ew> + Sub<Output = Ew>> TwoSwap<'a, IndexType, Nw, Ew> {
     pub fn new(graph: Box<dyn GenericWeightedGraph<IndexType, Nw, Ew>>, goal_point: IndexType, max_time: Ew, evaluator: &'a fn(Nw, Ew) -> f64) -> Self {
+        let first_edge_weight = *graph.edge_weight(graph.edge_ids()[0]).unwrap();
+
         let mut swap = TwoSwap {
             graph,
             goal_point,
@@ -18,6 +27,8 @@ impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> TwoSwap<'a, 
             evaluator,
             best_solution: Vec::new(),
             best_score: 0.0,
+            best_length: first_edge_weight - first_edge_weight,
+            visited_nodes: HashMap::new(),
         };
 
         swap.initialize();
@@ -38,16 +49,21 @@ impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> TwoSwap<'a, 
 
     pub fn initialize(&mut self) {
         let max = self.graph.iter_neighbors(self.goal_point).unwrap()
-            .map(|(id, weight)| (id, self.score_with_known_edge(id, *weight)))
-            .max_by(|(_, ev_a), (_, ev_b)| ev_a.partial_cmp(ev_b).unwrap())
-            .unwrap();
-        let best_return = self.graph.iter_neighbors(max.0).unwrap()
-            .map(|(id, weight)| (id, self.score_with_known_edge(id, *weight)))
-            .max_by(|(_, ev_a), (_, ev_b)| ev_a.partial_cmp(ev_b).unwrap())
-            .unwrap();
+            .filter(|(id, _)| self.graph.has_edge((*id, self.goal_point)))
+            .map(|(id, weight)| -> (IndexType, f64) {
+                (id, self.score_with_known_edge(id, *weight) + self.score_edge(id, self.goal_point))
+            })
+            .inspect(|x| println!("{:?}", x))
+            .max_by(|(_, ev_a), (_, ev_b)| ev_a.partial_cmp(ev_b).unwrap());
 
-        self.best_solution.push((max.0, best_return.0));
-        self.best_score = max.1 + best_return.1;
+        // if there is no path back max will have no solution
+        if let Some(solution) = max {
+            self.best_solution.push((self.goal_point, solution.0));
+            self.best_solution.push((solution.0, self.goal_point));
+            self.best_score = solution.1;
+            self.visited_nodes.insert(self.goal_point, true);
+            self.visited_nodes.insert(solution.0, true);
+        }
     }
 
     pub fn single_iteration(&mut self) -> Option<&Vec<Edge<IndexType>>> {
@@ -61,12 +77,15 @@ impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> TwoSwap<'a, 
             let mut best_follow = *to;
 
             for (nid, weight) in self.graph.iter_neighbors(*from).unwrap() {
-                temp_score = self.score_with_known_edge(nid, *weight);
-                if let Ok(return_weight) = self.graph.edge_weight((nid, *to)) {
-                    temp_score += self.score(*t_weight, *return_weight);
-                    if temp_score > max {
-                        max = temp_score;
-                        best_follow = nid;
+                // only visit nodes, that have not yet been visited
+                if !self.visited_nodes.contains_key(&nid) {
+                    temp_score = self.score_with_known_edge(nid, *weight);
+                    if let Ok(return_weight) = self.graph.edge_weight((nid, *to)) {
+                        temp_score += self.score(*t_weight, *return_weight);
+                        if temp_score > max {
+                            max = temp_score;
+                            best_follow = nid;
+                        }
                     }
                 }
             }
@@ -74,6 +93,7 @@ impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> TwoSwap<'a, 
             if best_follow != *to {
                 new_best.push((*from, best_follow));
                 new_best.push((best_follow, *to));
+                self.visited_nodes.insert(best_follow, true);
             } else {
                 new_best.push((*from, *to));
             }
@@ -81,6 +101,8 @@ impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> TwoSwap<'a, 
         }
 
         if score > self.best_score {
+            println!("old score: {}, new score: {}", self.best_score, score);
+            println!("old: {:?}, new {:?}", self.best_solution, new_best);
             self.best_solution = new_best;
             self.best_score = score;
             Some(&self.best_solution)
@@ -88,9 +110,13 @@ impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> TwoSwap<'a, 
             None
         }
     }
+
+    pub fn current_solution(&self) -> (&Vec<Edge<IndexType>>, f64) {
+        (&self.best_solution, self.best_score)
+    }
 }
 
-impl<'a, IndexType: Copy + std::cmp::PartialEq, Nw: Copy, Ew: Copy> Iterator for TwoSwap<'a, IndexType, Nw, Ew> {
+impl<'a, IndexType: Copy + PartialEq + Debug + Hash + Eq, Nw: Copy, Ew: Copy + Add<Output = Ew> + Sub<Output = Ew>> Iterator for TwoSwap<'a, IndexType, Nw, Ew> {
     type Item = Vec<Edge<IndexType>>;
 
     fn next(&mut self) -> Option<Self::Item> {

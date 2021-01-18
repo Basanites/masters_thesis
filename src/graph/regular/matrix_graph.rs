@@ -1,6 +1,6 @@
 use crate::graph::{ GenericWeightedGraph, WeightedGraph, Edge, GraphError };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MatrixGraph<Nw, Ew> {
     pub adjacency_matrix: Vec<Vec<Option<Ew>>>,
     node_weights: Vec<Option<Nw>>,
