@@ -1,7 +1,8 @@
 use crate::graph::{Edge, GenericWeightedGraph};
+use crate::metaheuristic::Solution;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::ops::{Add, Sub};
 
@@ -10,7 +11,7 @@ pub struct TwoSwap<'a, IndexType, Nw, Ew> {
     goal_point: IndexType,
     max_time: Ew,
     evaluator: &'a fn(Nw, Ew) -> f64,
-    best_solution: Vec<Edge<IndexType>>,
+    best_solution: Solution<IndexType>,
     best_score: f64,
     best_length: Ew,
 }
@@ -18,7 +19,7 @@ pub struct TwoSwap<'a, IndexType, Nw, Ew> {
 #[allow(clippy::eq_op)]
 impl<'a, IndexType, Nw, Ew> TwoSwap<'a, IndexType, Nw, Ew>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq,
+    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy,
     Ew: Copy + Add<Output = Ew> + Sub<Output = Ew>,
 {
@@ -35,7 +36,7 @@ where
             goal_point,
             max_time,
             evaluator,
-            best_solution: Vec::new(),
+            best_solution: Solution::new(),
             best_score: 0.0,
             best_length: first_edge_weight - first_edge_weight,
         };
@@ -77,21 +78,23 @@ where
 
         // if there is no path back max will have no solution
         if let Some(solution) = max {
-            self.best_solution.push((self.goal_point, solution.0));
-            self.best_solution.push((solution.0, self.goal_point));
+            self.best_solution.push_node(self.goal_point);
+            self.best_solution.push_node(solution.0);
+            self.best_solution.push_node(self.goal_point);
             self.best_score = solution.1;
         }
     }
 
-    pub fn single_iteration(&mut self) -> Option<&Vec<Edge<IndexType>>> {
-        let mut new_best = Vec::new();
+    pub fn single_iteration(&mut self) -> Option<&Solution<IndexType>> {
+        let mut new_best = Solution::from_nodes(vec![self.goal_point]);
         let mut temp_visited = HashMap::new();
         let mut max: f64;
         let mut score = 0.0;
         let mut temp_score: f64;
-        for (from, to) in self.best_solution.iter() {
+        for (from, to) in self.best_solution.iter_edges() {
             temp_visited.insert(*from, true);
             let t_weight = self.graph.node_weight(*to).unwrap();
+            // if we already visited the node we can ignore it
             max = if temp_visited.contains_key(to) {
                 0.0
             } else {
@@ -107,6 +110,7 @@ where
                     self.score_with_known_edge(nid, *weight)
                 };
                 if let Ok(return_weight) = self.graph.edge_weight((nid, *to)) {
+                    // only score this edge if the to node has not yet been visited
                     temp_score += if temp_visited.contains_key(to) {
                         0.0
                     } else {
@@ -121,18 +125,19 @@ where
 
             if best_follow != *to {
                 temp_visited.insert(best_follow, true);
-                new_best.push((*from, best_follow));
-                new_best.push((best_follow, *to));
+                temp_visited.insert(*to, true);
+                new_best.push_node(best_follow);
+                new_best.push_node(*to);
             } else {
                 temp_visited.insert(*to, true);
-                new_best.push((*from, *to));
+                new_best.push_node(*to);
             }
             score += max;
         }
 
         if score > self.best_score {
             println!("old score: {}, new score: {}", self.best_score, score);
-            println!("old: {:?}, new {:?}", self.best_solution, new_best);
+            println!("old: {}, new {}", self.best_solution, new_best);
             self.best_solution = new_best;
             self.best_score = score;
             Some(&self.best_solution)
@@ -141,18 +146,18 @@ where
         }
     }
 
-    pub fn current_solution(&self) -> (&Vec<Edge<IndexType>>, f64) {
+    pub fn current_solution(&self) -> (&Solution<IndexType>, f64) {
         (&self.best_solution, self.best_score)
     }
 }
 
 impl<'a, IndexType, Nw, Ew> Iterator for TwoSwap<'a, IndexType, Nw, Ew>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq,
+    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy,
     Ew: Copy + Add<Output = Ew> + Sub<Output = Ew>,
 {
-    type Item = Vec<Edge<IndexType>>;
+    type Item = Solution<IndexType>;
 
     fn next(&mut self) -> Option<Self::Item> {
         println!("called next");
