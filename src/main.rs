@@ -1,18 +1,17 @@
 #![feature(test)]
+mod geo;
+mod graph;
+mod metaheuristic;
+mod util;
+
+use graph::export::SVG;
+use graph::import::import_pbf;
+use graph::{Edge, GenericWeightedGraph, WeightedGraph};
+use metaheuristic::TwoSwap;
+use util::Point;
 
 use std::fs::File;
 use std::io::Write;
-
-mod geo;
-mod graph;
-use graph::{GenericWeightedGraph, WeightedGraph, Edge};
-use graph::export::{SVG};
-use graph::import::import_pbf;
-mod metaheuristic;
-use metaheuristic::TwoSwap;
-mod util;
-use util::Point;
-
 
 fn main() -> std::io::Result<()> {
     let graph = graph::regular::MatrixGraph::new(
@@ -31,18 +30,19 @@ fn main() -> std::io::Result<()> {
             (4, 1, 7.0),
             (4, 2, 12.0),
             (4, 3, 7.5),
-        ]
-    ).unwrap();
+        ],
+    )
+    .unwrap();
 
     let eval: fn(f64, f64) -> f64 = |nw, ew| nw;
     let mut optimizer = TwoSwap::new(Box::new(graph), 0, 100.0, &eval);
     println!("{:?}", optimizer.current_solution());
-    for _ in 1..10 {
+    for _ in 1..5 {
         let val = optimizer.next();
         if val.is_some() {
             println!("{:?}", val);
         } else {
-            break
+            break;
         }
     }
 

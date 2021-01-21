@@ -1,13 +1,13 @@
 mod error;
 
-pub mod import;
 pub mod export;
 pub mod generate;
-pub mod regular;
 pub mod geo;
+pub mod import;
+pub mod regular;
 
-pub use error::{ GraphError };
 use crate::geo::GeoPoint;
+pub use error::GraphError;
 
 pub type Edge<IndexType> = (IndexType, IndexType);
 
@@ -35,7 +35,10 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
 
     /// Returns an iterator over the neighboring ids.
     /// Returns GraphError, if the specified node id is not in the graph.
-    fn iter_neighbor_ids(&self, id: IndexType) -> Result<Box<dyn Iterator<Item = IndexType> + '_>, GraphError>;
+    fn iter_neighbor_ids(
+        &self,
+        id: IndexType,
+    ) -> Result<Box<dyn Iterator<Item = IndexType> + '_>, GraphError>;
 
     /// Returns the neighbors of the node with id.
     /// Returns an error if node is not in graph.
@@ -43,7 +46,10 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
 
     /// Returns an iterator over the neighbor ids with a reference to that edges weight
     /// Returns an error if the node is not in the graph.
-    fn iter_neighbors(&self, id: IndexType) -> Result<Box<dyn Iterator<Item = (IndexType, &Ew)> + '_>, GraphError>;
+    fn iter_neighbors(
+        &self,
+        id: IndexType,
+    ) -> Result<Box<dyn Iterator<Item = (IndexType, &Ew)> + '_>, GraphError>;
 
     /// Returns true if node with id is a member, or false otherwise.
     fn has_node(&self, id: IndexType) -> bool;
@@ -91,12 +97,11 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
     /// If the edge did not exist before, it gets created in this process.
     /// If the new edge can't be created, because one of the nodes is not in the graph this errors.
     fn change_edge(&mut self, edge: Edge<IndexType>, weight: Ew) -> Result<(), GraphError>;
-
 }
 
-pub trait WeightedGraph<Nw, Ew> : GenericWeightedGraph<usize, Nw, Ew> {}
+pub trait WeightedGraph<Nw, Ew>: GenericWeightedGraph<usize, Nw, Ew> {}
 
-pub trait GeoGraph<Nw, Ew> : GenericWeightedGraph<GeoPoint, Nw, Ew> {}
+pub trait GeoGraph<Nw, Ew>: GenericWeightedGraph<GeoPoint, Nw, Ew> {}
 
 pub trait GenericGraph<IndexType> {
     /// Returns true if there are no nodes, or false otherwise.
@@ -116,7 +121,10 @@ pub trait GenericGraph<IndexType> {
 
     /// Returns an iterator over the neighbors of node with given id.
     /// Returns an error if that node is not in the graph.
-    fn iter_neighbors(&self, id: IndexType) -> Result<Box<dyn Iterator<Item = IndexType> + '_>, GraphError>;
+    fn iter_neighbors(
+        &self,
+        id: IndexType,
+    ) -> Result<Box<dyn Iterator<Item = IndexType> + '_>, GraphError>;
 
     /// Returns the neighbors of the node with id.
     /// Returns an error if node is not in graph.
@@ -155,4 +163,4 @@ pub trait GenericGraph<IndexType> {
     fn remove_edge(&mut self, edge: Edge<IndexType>);
 }
 
-pub trait Graph : GenericGraph<usize> {}
+pub trait Graph: GenericGraph<usize> {}

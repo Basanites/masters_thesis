@@ -1,13 +1,13 @@
 #[allow(dead_code)]
 mod erdos_renyi;
 #[allow(dead_code)]
-mod stochastic_block;
-#[allow(dead_code)]
 mod grid;
+#[allow(dead_code)]
+mod stochastic_block;
 
 pub use erdos_renyi::ErdosRenyi;
-pub use stochastic_block::StochasticBlock;
 pub use grid::Grid;
+pub use stochastic_block::StochasticBlock;
 
 use crate::graph::WeightedGraph;
 

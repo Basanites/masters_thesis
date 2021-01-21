@@ -1,5 +1,5 @@
 use std::f64::consts::PI;
-use std::hash::{ Hash, Hasher };
+use std::hash::{Hash, Hasher};
 
 #[derive(Copy, Clone)]
 pub struct GeoPoint {

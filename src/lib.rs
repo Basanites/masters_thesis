@@ -1,5 +1,5 @@
 #![feature(test)]
-pub mod graph;
 pub mod geo;
-pub mod util;
+pub mod graph;
 pub mod metaheuristic;
+pub mod util;
