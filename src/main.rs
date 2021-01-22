@@ -40,7 +40,7 @@ fn main() -> std::io::Result<()> {
     for _ in 1..5 {
         let val = optimizer.next();
         if val.is_some() {
-            println!("{}", val.unwrap());
+            println!("{:?}", optimizer.current_solution());
         } else {
             break;
         }
