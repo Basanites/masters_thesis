@@ -1,15 +1,14 @@
 use crate::graph::{Edge, GenericWeightedGraph, GraphError};
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
-use std::hash::Hash;
 use std::iter::Sum;
 
 pub fn solution_length<IndexType, Nw, Ew>(
     solution: &Solution<IndexType>,
     graph: &Box<dyn GenericWeightedGraph<IndexType, Nw, Ew>>,
-) -> Result<Ew, GraphError>
+) -> Result<Ew, GraphError<IndexType>>
 where
-    IndexType: PartialEq + Copy,
+    IndexType: PartialEq + Copy + Debug,
     Ew: Sum + Copy,
 {
     for (from, to) in solution.iter_edges() {

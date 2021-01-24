@@ -15,7 +15,7 @@ impl<Nw: Clone, Ew: Clone> MatrixGraph<Nw, Ew> {
     /// The indices of nodes are inferred from their position in the given array,
     /// meaning the node at nodes[i] will get the index i in the graph instance.
     /// If any of the edges don't fit this scheme an error is returned.
-    pub fn new(nodes: Vec<Nw>, edges: Vec<(usize, usize, Ew)>) -> Result<Self, GraphError> {
+    pub fn new(nodes: Vec<Nw>, edges: Vec<(usize, usize, Ew)>) -> Result<Self, GraphError<usize>> {
         let node_amount = nodes.len();
 
         let mut graph = MatrixGraph {
@@ -66,7 +66,7 @@ impl<Nw: Clone, Ew: Clone> MatrixGraph<Nw, Ew> {
 #[allow(dead_code)]
 impl MatrixGraph<(), ()> {
     /// Constructs an unweighted MatrixGraph using the given amount of nodes and list of edges.
-    pub fn new_unweighted(nodes: usize, edges: &[Edge<usize>]) -> Result<Self, GraphError> {
+    pub fn new_unweighted(nodes: usize, edges: &[Edge<usize>]) -> Result<Self, GraphError<usize>> {
         // initialization works basically the same way as for generic types.
         let mut graph = MatrixGraph {
             adjacency_matrix: (0..nodes).map(|_| vec![None; nodes]).collect(),
@@ -137,7 +137,7 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
         )
     }
 
-    fn node_weight(&self, id: usize) -> Result<&Nw, GraphError> {
+    fn node_weight(&self, id: usize) -> Result<&Nw, GraphError<usize>> {
         if !self.has_node(id) {
             return Err(GraphError::MissingNode(id));
         }
@@ -149,7 +149,7 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
     fn iter_neighbor_ids(
         &self,
         id: usize,
-    ) -> Result<Box<dyn Iterator<Item = usize> + '_>, GraphError> {
+    ) -> Result<Box<dyn Iterator<Item = usize> + '_>, GraphError<usize>> {
         if !self.has_node(id) {
             return Err(GraphError::MissingNode(id));
         }
@@ -164,7 +164,7 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
         ))
     }
 
-    fn neighbor_ids(&self, id: usize) -> Result<Vec<usize>, GraphError> {
+    fn neighbor_ids(&self, id: usize) -> Result<Vec<usize>, GraphError<usize>> {
         match self.iter_neighbor_ids(id) {
             Ok(iterator) => Ok(iterator.collect()),
             Err(error) => Err(error),
@@ -174,7 +174,7 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
     fn iter_neighbors(
         &self,
         id: usize,
-    ) -> Result<Box<dyn Iterator<Item = (usize, &Ew)> + '_>, GraphError> {
+    ) -> Result<Box<dyn Iterator<Item = (usize, &Ew)> + '_>, GraphError<usize>> {
         if !self.has_node(id) {
             return Err(GraphError::MissingNode(id));
         }
@@ -193,7 +193,7 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
         self.node_weights.len() > id && self.node_weights[id].is_some()
     }
 
-    fn add_node(&mut self, id: usize, weight: Nw) -> Result<(), GraphError> {
+    fn add_node(&mut self, id: usize, weight: Nw) -> Result<(), GraphError<usize>> {
         if self.node_weights.len() > id && self.has_node(id) {
             return Err(GraphError::DuplicateNode(id));
         } else if self.node_weights.len() < id {
@@ -236,7 +236,7 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
         }
     }
 
-    fn degree(&self, id: usize) -> Result<usize, GraphError> {
+    fn degree(&self, id: usize) -> Result<usize, GraphError<usize>> {
         // GraphError can be thrown if the node with id is not in the graph.
         Ok(self.neighbor_ids(id)?.len())
     }
@@ -275,7 +275,7 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
         )
     }
 
-    fn edge_weight(&self, edge: Edge<usize>) -> Result<&Ew, GraphError> {
+    fn edge_weight(&self, edge: Edge<usize>) -> Result<&Ew, GraphError<usize>> {
         let (start_node, end_node) = edge;
         if !self.has_edge(edge) {
             return Err(GraphError::MissingEdge(edge));
@@ -295,7 +295,7 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
         self.adjacency_matrix[start_node][end_node].is_some()
     }
 
-    fn add_edge(&mut self, edge: Edge<usize>, weight: Ew) -> Result<(), GraphError> {
+    fn add_edge(&mut self, edge: Edge<usize>, weight: Ew) -> Result<(), GraphError<usize>> {
         let (start_node, end_node) = edge;
         if self.has_edge(edge) {
             return Err(GraphError::DuplicateEdge(edge));
@@ -320,7 +320,7 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
         }
     }
 
-    fn change_edge(&mut self, edge: Edge<usize>, weight: Ew) -> Result<(), GraphError> {
+    fn change_edge(&mut self, edge: Edge<usize>, weight: Ew) -> Result<(), GraphError<usize>> {
         if self.has_edge(edge) {
             self.adjacency_matrix[edge.0][edge.1] = Some(weight);
             Ok(())

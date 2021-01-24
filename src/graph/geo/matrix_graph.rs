@@ -14,7 +14,7 @@ impl<Nw: Copy, Ew: Copy> MatrixGraph<Nw, Ew> {
     pub fn new(
         nodes: Vec<(GeoPoint, Nw)>,
         edges: Vec<(Edge<GeoPoint>, Ew)>,
-    ) -> Result<Self, GraphError> {
+    ) -> Result<Self, GraphError<GeoPoint>> {
         let mut node_map = HashMap::new();
         let mut inv_node_map = HashMap::new();
         for (i, loc) in nodes.iter().enumerate() {
@@ -36,7 +36,43 @@ impl<Nw: Copy, Ew: Copy> MatrixGraph<Nw, Ew> {
                 node_map,
                 inv_node_map,
             }),
-            Err(e) => Err(e),
+            Err(e) => match e {
+                GraphError::MissingNode(node) => Err(GraphError::MissingNode(inv_node_map[&node])),
+                GraphError::MissingEdge(edge) => Err(GraphError::MissingEdge((
+                    inv_node_map[&edge.0],
+                    inv_node_map[&edge.1],
+                ))),
+                GraphError::DuplicateNode(node) => {
+                    Err(GraphError::DuplicateNode(inv_node_map[&node]))
+                }
+                GraphError::DuplicateEdge(edge) => Err(GraphError::DuplicateEdge((
+                    inv_node_map[&edge.0],
+                    inv_node_map[&edge.1],
+                ))),
+            },
+        }
+    }
+
+    fn mapped_result<CorrectType>(
+        &self,
+        result: Result<CorrectType, GraphError<usize>>,
+    ) -> Result<CorrectType, GraphError<GeoPoint>> {
+        match result {
+            Err(GraphError::MissingNode(node)) => {
+                Err(GraphError::MissingNode(self.inv_node_map[&node]))
+            }
+            Err(GraphError::MissingEdge(edge)) => Err(GraphError::MissingEdge((
+                self.inv_node_map[&edge.0],
+                self.inv_node_map[&edge.1],
+            ))),
+            Err(GraphError::DuplicateNode(node)) => {
+                Err(GraphError::DuplicateNode(self.inv_node_map[&node]))
+            }
+            Err(GraphError::DuplicateEdge(edge)) => Err(GraphError::DuplicateEdge((
+                self.inv_node_map[&edge.0],
+                self.inv_node_map[&edge.1],
+            ))),
+            Ok(some) => Ok(some),
         }
     }
 }
@@ -71,34 +107,38 @@ impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<GeoPoint, Nw, Ew> for MatrixGraph<
         )
     }
 
-    fn node_weight(&self, id: GeoPoint) -> Result<&Nw, GraphError> {
-        self.internal_graph.node_weight(self.node_map[&id])
+    fn node_weight(&self, id: GeoPoint) -> Result<&Nw, GraphError<GeoPoint>> {
+        let weight = self.internal_graph.node_weight(self.node_map[&id]);
+        self.mapped_result(weight)
     }
 
     fn iter_neighbor_ids(
         &self,
         id: GeoPoint,
-    ) -> Result<Box<dyn Iterator<Item = GeoPoint> + '_>, GraphError> {
+    ) -> Result<Box<dyn Iterator<Item = GeoPoint> + '_>, GraphError<GeoPoint>> {
         let inner = self.internal_graph.iter_neighbor_ids(self.node_map[&id]);
-        match inner {
+        let res = self.mapped_result(inner);
+        match res {
             Ok(iterator) => Ok(Box::new(iterator.map(move |id| self.inv_node_map[&id]))),
             Err(e) => Err(e),
         }
     }
 
-    fn neighbor_ids(&self, id: GeoPoint) -> Result<Vec<GeoPoint>, GraphError> {
-        match self.iter_neighbor_ids(id) {
+    fn neighbor_ids(&self, id: GeoPoint) -> Result<Vec<GeoPoint>, GraphError<GeoPoint>> {
+        let res = self.iter_neighbor_ids(id);
+        match res {
             Ok(iterator) => Ok(iterator.collect()),
-            Err(error) => Err(error),
+            Err(e) => Err(e),
         }
     }
 
     fn iter_neighbors(
         &self,
         id: GeoPoint,
-    ) -> Result<Box<dyn Iterator<Item = (GeoPoint, &Ew)> + '_>, GraphError> {
+    ) -> Result<Box<dyn Iterator<Item = (GeoPoint, &Ew)> + '_>, GraphError<GeoPoint>> {
         let inner = self.internal_graph.iter_neighbors(self.node_map[&id]);
-        match inner {
+        let res = self.mapped_result(inner);
+        match res {
             Ok(iterator) => Ok(Box::new(
                 iterator.map(move |(id, point)| (self.inv_node_map[&id], point)),
             )),
@@ -110,11 +150,12 @@ impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<GeoPoint, Nw, Ew> for MatrixGraph<
         self.node_map.contains_key(&id) && self.internal_graph.has_node(self.node_map[&id])
     }
 
-    fn add_node(&mut self, id: GeoPoint, weight: Nw) -> Result<(), GraphError> {
+    fn add_node(&mut self, id: GeoPoint, weight: Nw) -> Result<(), GraphError<GeoPoint>> {
         // order is always amount of nodes + 1, so we can use it as our new id for internal
         let inner_id = self.internal_graph.order();
         let res = self.internal_graph.add_node(inner_id, weight);
-        match res {
+        let mapped_res = self.mapped_result(res);
+        match mapped_res {
             Ok(_) => {
                 self.node_map.insert(id, inner_id);
                 self.inv_node_map.insert(inner_id, id);
@@ -142,8 +183,9 @@ impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<GeoPoint, Nw, Ew> for MatrixGraph<
         }
     }
 
-    fn degree(&self, id: GeoPoint) -> Result<usize, GraphError> {
-        self.internal_graph.degree(self.node_map[&id])
+    fn degree(&self, id: GeoPoint) -> Result<usize, GraphError<GeoPoint>> {
+        let degree = self.internal_graph.degree(self.node_map[&id]);
+        self.mapped_result(degree)
     }
 
     fn iter_edge_ids(&self) -> Box<dyn Iterator<Item = Edge<GeoPoint>> + '_> {
@@ -168,9 +210,11 @@ impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<GeoPoint, Nw, Ew> for MatrixGraph<
         )
     }
 
-    fn edge_weight(&self, edge: Edge<GeoPoint>) -> Result<&Ew, GraphError> {
-        self.internal_graph
-            .edge_weight((self.node_map[&edge.0], self.node_map[&edge.1]))
+    fn edge_weight(&self, edge: Edge<GeoPoint>) -> Result<&Ew, GraphError<GeoPoint>> {
+        let weight = self
+            .internal_graph
+            .edge_weight((self.node_map[&edge.0], self.node_map[&edge.1]));
+        self.mapped_result(weight)
     }
 
     fn has_edge(&self, edge: Edge<GeoPoint>) -> bool {
@@ -178,9 +222,11 @@ impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<GeoPoint, Nw, Ew> for MatrixGraph<
             .has_edge((self.node_map[&edge.0], self.node_map[&edge.1]))
     }
 
-    fn add_edge(&mut self, edge: Edge<GeoPoint>, weight: Ew) -> Result<(), GraphError> {
-        self.internal_graph
-            .add_edge((self.node_map[&edge.0], self.node_map[&edge.1]), weight)
+    fn add_edge(&mut self, edge: Edge<GeoPoint>, weight: Ew) -> Result<(), GraphError<GeoPoint>> {
+        let edge = self
+            .internal_graph
+            .add_edge((self.node_map[&edge.0], self.node_map[&edge.1]), weight);
+        self.mapped_result(edge)
     }
 
     fn remove_edge(&mut self, edge: Edge<GeoPoint>) {
@@ -188,9 +234,15 @@ impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<GeoPoint, Nw, Ew> for MatrixGraph<
             .remove_edge((self.node_map[&edge.0], self.node_map[&edge.1]));
     }
 
-    fn change_edge(&mut self, edge: Edge<GeoPoint>, weight: Ew) -> Result<(), GraphError> {
-        self.internal_graph
-            .change_edge((self.node_map[&edge.0], self.node_map[&edge.1]), weight)
+    fn change_edge(
+        &mut self,
+        edge: Edge<GeoPoint>,
+        weight: Ew,
+    ) -> Result<(), GraphError<GeoPoint>> {
+        let edge = self
+            .internal_graph
+            .change_edge((self.node_map[&edge.0], self.node_map[&edge.1]), weight);
+        self.mapped_result(edge)
     }
 }
 
