@@ -5,13 +5,14 @@ pub struct Scaler<T> {
 }
 
 impl<T> Scaler<T>
-    where T: Copy + std::ops::Sub<Output = T> + std::ops::Div<Output = T>
+where
+    T: Copy + std::ops::Sub<Output = T> + std::ops::Div<Output = T>,
 {
     pub fn new(min: T, max: T) -> Self {
         Scaler {
             min,
             max,
-            diff: max - min
+            diff: max - min,
         }
     }
 

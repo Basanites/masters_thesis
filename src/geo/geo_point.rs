@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
-use std::hash::{ Hash, Hasher };
+use std::hash::{Hash, Hasher};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct GeoPoint {
     micro_lat: u32,
     micro_lon: u32,

@@ -1,11 +1,13 @@
 use super::Generate;
-use crate::graph::{GenericWeightedGraph, WeightedGraph, regular::MatrixGraph};
+use crate::graph::{regular::MatrixGraph, GenericWeightedGraph, WeightedGraph};
 
 use rand::{thread_rng, Rng};
 
-pub struct ErdosRenyi<'a, Nw, Ew> where
+pub struct ErdosRenyi<'a, Nw, Ew>
+where
     Nw: Clone,
-    Ew: Clone {
+    Ew: Clone,
+{
     size: usize,
     connection_probability: f64,
     nw_generator: &'a dyn Fn() -> Nw,
@@ -13,13 +15,14 @@ pub struct ErdosRenyi<'a, Nw, Ew> where
 }
 
 impl<'a, Nw: Clone, Ew: Clone> ErdosRenyi<'a, Nw, Ew> {
-    pub fn new(size: usize, 
-        connection_probability: f64, 
-        nw_generator: &'a dyn Fn() -> Nw, 
-        ew_generator: &'a dyn Fn() -> Ew)
-        -> ErdosRenyi<'a, Nw, Ew> {
+    pub fn new(
+        size: usize,
+        connection_probability: f64,
+        nw_generator: &'a dyn Fn() -> Nw,
+        ew_generator: &'a dyn Fn() -> Ew,
+    ) -> ErdosRenyi<'a, Nw, Ew> {
         ErdosRenyi {
-            size, 
+            size,
             connection_probability,
             nw_generator,
             ew_generator,

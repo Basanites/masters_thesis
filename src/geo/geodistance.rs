@@ -6,7 +6,14 @@ use super::GeoPoint;
 pub fn geodistance_haversine(point_a: GeoPoint, point_b: GeoPoint) -> f64 {
     // average earth radius is assumed to be 6371km
     2.0 * 6371.0
-        * (((point_b.lat_rad() - point_a.lat_rad()) / 2.0).sin().powi(2)
-        + point_a.lat_rad().cos() * point_b.lat_rad().cos()
-        * ((point_b.lon_rad() - point_a.lon_rad()) / 2.0).sin().powi(2)).sqrt().asin()
+        * (((point_b.lat_rad() - point_a.lat_rad()) / 2.0)
+            .sin()
+            .powi(2)
+            + point_a.lat_rad().cos()
+                * point_b.lat_rad().cos()
+                * ((point_b.lon_rad() - point_a.lon_rad()) / 2.0)
+                    .sin()
+                    .powi(2))
+        .sqrt()
+        .asin()
 }

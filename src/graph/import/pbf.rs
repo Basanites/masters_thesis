@@ -1,13 +1,13 @@
 #![allow(clippy::map_entry)]
-use std::fs::File;
-use osmpbfreader::OsmPbfReader;
 use osmpbfreader::objects::Node;
-use osmpbfreader::{ OsmId, OsmObj, NodeId };
-use std::collections::{ HashMap, HashSet };
+use osmpbfreader::OsmPbfReader;
+use osmpbfreader::{NodeId, OsmId, OsmObj};
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
 
-use crate::graph::{ regular::MatrixGraph, GenericWeightedGraph };
+use crate::geo::{geodistance_haversine, GeoPoint};
+use crate::graph::{regular::MatrixGraph, GenericWeightedGraph};
 use crate::util::Point;
-use crate::geo::{ GeoPoint, geodistance_haversine };
 
 /// Calculates the distance between two nodes in km.
 fn get_node_distance(node_1: &Node, node_2: &Node) -> f64 {
@@ -18,7 +18,8 @@ fn get_node_distance(node_1: &Node, node_2: &Node) -> f64 {
 
 /// Calculates the traveltime in minutes for a given distance_map in km.
 fn traveltime_from_distance_map(dist_map: &HashMap<String, f64>) -> f64 {
-    dist_map.iter()
+    dist_map
+        .iter()
         .map(|(key, val)| -> f64 {
             // speeds are given in km/h so dividing by them returns time in hrs
             let factor = match &key[..] {
@@ -28,7 +29,7 @@ fn traveltime_from_distance_map(dist_map: &HashMap<String, f64>) -> f64 {
                 "tertiary" => 1.0 / 70.0,
                 "residential" => 1.0 / 50.0,
                 "living_street" => 1.0 / 30.0,
-                _ => 0.5 // if we don't know the street type we just assume 50km/h
+                _ => 0.5, // if we don't know the street type we just assume 50km/h
             };
             // we need to multiply by 60 to get to minutes
             val * factor * 60.0
@@ -38,9 +39,11 @@ fn traveltime_from_distance_map(dist_map: &HashMap<String, f64>) -> f64 {
 
 /// Finds the replacement for a node and updates the distance_map and
 /// returns the replacement as well as the according distance map
-fn get_node_replacement (replacement_map: &HashMap<OsmId, (OsmId, HashMap<String, f64>)>,
-                         replacement: OsmId, dist_map: HashMap<String, f64>)
-    -> (OsmId, HashMap<String, f64>) {
+fn get_node_replacement(
+    replacement_map: &HashMap<OsmId, (OsmId, HashMap<String, f64>)>,
+    replacement: OsmId,
+    dist_map: HashMap<String, f64>,
+) -> (OsmId, HashMap<String, f64>) {
     // the updated distance map contains the sum of the replacement distances with the
     // distances it takes to get there.
     let mut updated_dist_map = HashMap::new();
@@ -61,10 +64,12 @@ fn get_node_replacement (replacement_map: &HashMap<OsmId, (OsmId, HashMap<String
 /// Finds all nodes which are on a path with just a single connection and
 /// updates the replacement map accordingly.
 /// Returns true if there have been any new replacements.
-fn find_contractable_nodes(neighbors: &HashMap<OsmId, HashMap<OsmId, HashMap<String, f64>>>,
-                           inv_neighbors: &HashMap<OsmId, Vec<OsmId>>,
-                           replacement_map: &mut HashMap<OsmId, (OsmId, HashMap<String, f64>)>,
-                           circle_nodes: &mut HashSet<OsmId>) -> bool {
+fn find_contractable_nodes(
+    neighbors: &HashMap<OsmId, HashMap<OsmId, HashMap<String, f64>>>,
+    inv_neighbors: &HashMap<OsmId, Vec<OsmId>>,
+    replacement_map: &mut HashMap<OsmId, (OsmId, HashMap<String, f64>)>,
+    circle_nodes: &mut HashSet<OsmId>,
+) -> bool {
     let mut changed = false;
 
     let mut change_count = 0;
@@ -80,7 +85,8 @@ fn find_contractable_nodes(neighbors: &HashMap<OsmId, HashMap<OsmId, HashMap<Str
 
             // we iterate as deeply, as our replacement map allows
             while replacement_map.contains_key(&replacement) && counter < maxits {
-                let new_replacement_pair = get_node_replacement(&replacement_map, replacement, dist_map.clone());
+                let new_replacement_pair =
+                    get_node_replacement(&replacement_map, replacement, dist_map.clone());
                 replacement = new_replacement_pair.0;
                 dist_map = new_replacement_pair.1;
 
@@ -99,7 +105,7 @@ fn find_contractable_nodes(neighbors: &HashMap<OsmId, HashMap<OsmId, HashMap<Str
                     circle_nodes.insert(*replacement);
                     changed = true;
                     change_count += 1;
-                    break
+                    break;
                 }
                 counter += 1;
             }
@@ -133,9 +139,11 @@ fn find_contractable_nodes(neighbors: &HashMap<OsmId, HashMap<OsmId, HashMap<Str
 
 /// Contracts all nodes on a single connection path into one endpoint node.
 /// The distances for these nodes are updated according to their original distance with many hops in between.
-fn contract_nodes(nodes: &mut HashMap<OsmId, OsmObj>,
-                  neighbors: &mut HashMap<OsmId, HashMap<OsmId, HashMap<String, f64>>>,
-                  inv_neighbors: HashMap<OsmId, Vec<OsmId>>) {
+fn contract_nodes(
+    nodes: &mut HashMap<OsmId, OsmObj>,
+    neighbors: &mut HashMap<OsmId, HashMap<OsmId, HashMap<String, f64>>>,
+    inv_neighbors: HashMap<OsmId, Vec<OsmId>>,
+) {
     let mut replacement_map: HashMap<OsmId, (OsmId, HashMap<String, f64>)> = HashMap::new();
     let mut circle_nodes = HashSet::<OsmId>::new();
     let mut changed = true;
@@ -143,8 +151,17 @@ fn contract_nodes(nodes: &mut HashMap<OsmId, OsmObj>,
     let mut i = 0;
 
     while changed {
-        println!("contraction iteration {:?} with {:?} nodes to replace", i, replacement_map.len());
-        changed = find_contractable_nodes(neighbors, &inv_neighbors, &mut replacement_map, &mut circle_nodes); // assignment with side effects == very bad style
+        println!(
+            "contraction iteration {:?} with {:?} nodes to replace",
+            i,
+            replacement_map.len()
+        );
+        changed = find_contractable_nodes(
+            neighbors,
+            &inv_neighbors,
+            &mut replacement_map,
+            &mut circle_nodes,
+        ); // assignment with side effects == very bad style
         i += 1;
     }
 
@@ -179,12 +196,16 @@ fn contract_nodes(nodes: &mut HashMap<OsmId, OsmObj>,
         nodes.remove(from);
     }
 
-    println!("The replacement map contains {} items after removing {:?} nodes in a circle", replacement_map.len(), circle_nodes.len());
+    println!(
+        "The replacement map contains {} items after removing {:?} nodes in a circle",
+        replacement_map.len(),
+        circle_nodes.len()
+    );
 }
 
 /// Creates a minimized MatrixGraph from a given pbf file.
 /// The nodes are contracted as to not run out of memory for the MatrixGraph.
-pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
+pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64> {
     let mut pbf = OsmPbfReader::new(File::open(path).unwrap());
     let mut neighbors = HashMap::<OsmId, HashMap<OsmId, HashMap<String, f64>>>::new();
     let mut inv_neighbors = HashMap::<OsmId, Vec<OsmId>>::new();
@@ -195,8 +216,7 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
         let obj = obj.unwrap();
         if obj.is_node() {
             nodes.insert(obj.id(), obj);
-        }
-        else if obj.is_way() {
+        } else if obj.is_way() {
             let mut pid = NodeId(0);
             for (i, &nid) in obj.way().unwrap().nodes.iter().enumerate() {
                 if i > 0 {
@@ -231,7 +251,10 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
                     if neighbors.contains_key(&p_key) {
                         let neighbor_dists = neighbors.get_mut(&p_key).unwrap();
                         if neighbor_dists.contains_key(&n_key) {
-                            neighbor_dists.get_mut(&n_key).unwrap().insert(road_type, distance);
+                            neighbor_dists
+                                .get_mut(&n_key)
+                                .unwrap()
+                                .insert(road_type, distance);
                         } else {
                             let mut new_dists = HashMap::new();
                             new_dists.insert(road_type, distance);
@@ -280,7 +303,7 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
         let obj = &nodes[id];
         let pos = Point {
             x: obj.node().unwrap().lat(),
-            y: obj.node().unwrap().lon()
+            y: obj.node().unwrap().lon(),
         };
         // TODO: when logger is here, log this to errorlog
         let _ = mapped_graph.add_node(i, (pos, 1));
@@ -291,7 +314,25 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64>{
         for (to_id, dist_map) in neighbor_nodes {
             if node_map.contains_key(from_id) && node_map.contains_key(to_id) && from_id != to_id {
                 // TODO: when logger is here this needs to go to errorlog
-                let _ = mapped_graph.add_edge((node_map[from_id], node_map[to_id]), traveltime_from_distance_map(dist_map));
+                let _ = mapped_graph.add_edge(
+                    (node_map[from_id], node_map[to_id]),
+                    traveltime_from_distance_map(dist_map),
+                );
+            }
+        }
+    }
+
+    // Insert inverse edges with their weight being the traveltime between each other.
+    for (to_id, neighbor_nodes) in neighbors.iter() {
+        for (from_id, dist_map) in neighbor_nodes {
+            if node_map.contains_key(from_id) && node_map.contains_key(to_id) && from_id != to_id {
+                let m_fid = node_map[from_id];
+                let m_tid = node_map[to_id];
+                if !mapped_graph.has_edge((m_fid, m_tid)) {
+                    // TODO: when logger is here this needs to go to errorlog
+                    let _ = mapped_graph
+                        .add_edge((m_fid, m_tid), traveltime_from_distance_map(dist_map));
+                }
             }
         }
     }

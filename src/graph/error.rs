@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq)]
-pub enum GraphError {
-    MissingEdge((usize, usize)),
-    DuplicateEdge((usize, usize)),
-    MissingNode(usize),
-    DuplicateNode(usize),
+pub enum GraphError<IndexType> {
+    MissingEdge((IndexType, IndexType)),
+    DuplicateEdge((IndexType, IndexType)),
+    MissingNode(IndexType),
+    DuplicateNode(IndexType),
 }

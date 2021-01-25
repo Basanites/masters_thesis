@@ -1,22 +1,25 @@
 use super::Generate;
-use crate::graph::{GenericWeightedGraph, WeightedGraph, regular::MatrixGraph};
-use std::marker::PhantomData;
+use crate::graph::{regular::MatrixGraph, GenericWeightedGraph, WeightedGraph};
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
-pub struct Grid<'a, Nw, Ew> where
+pub struct Grid<'a, Nw, Ew>
+where
     Nw: Clone,
-    Ew: Clone {
-        size: (usize, usize),
-        nw_generator: &'a dyn Fn() -> Nw,
-        ew_generator: &'a dyn Fn() -> Ew,
-        phantom: PhantomData<(Nw, Ew)>,
+    Ew: Clone,
+{
+    size: (usize, usize),
+    nw_generator: &'a dyn Fn() -> Nw,
+    ew_generator: &'a dyn Fn() -> Ew,
+    phantom: PhantomData<(Nw, Ew)>,
 }
 
 impl<'a, Nw: Clone, Ew: Clone> Grid<'a, Nw, Ew> {
-    pub fn new(size: (usize, usize),
+    pub fn new(
+        size: (usize, usize),
         nw_generator: &'a dyn Fn() -> Nw,
-        ew_generator: &'a dyn Fn() -> Ew) 
-        -> Grid<'a, Nw, Ew> {
+        ew_generator: &'a dyn Fn() -> Ew,
+    ) -> Grid<'a, Nw, Ew> {
         Grid {
             size,
             nw_generator,
@@ -32,7 +35,7 @@ impl<'a, Nw: 'static + Clone, Ew: 'static + Clone> Generate<Nw, Ew> for Grid<'a,
     fn generate(&self) -> Box<dyn WeightedGraph<Nw, Ew>> {
         let mut graph = MatrixGraph::<Nw, Ew>::with_size(self.size.0 * self.size.1);
 
-        // count is used to generate consecutive numbered ids. 
+        // count is used to generate consecutive numbered ids.
         // This means we need to remember which id an abstract (i, j) edge corresponds to.
         // This is done via the id_map.
         let mut id_map = HashMap::new();
@@ -47,17 +50,37 @@ impl<'a, Nw: 'static + Clone, Ew: 'static + Clone> Generate<Nw, Ew> for Grid<'a,
 
         for i in 0..self.size.0 {
             for j in 0..self.size.1 {
-                if i < self.size.0 -1 {
-                    graph.add_edge((id_map[&(i, j)], id_map[&(i + 1, j)]), (self.ew_generator)()).unwrap();
+                if i < self.size.0 - 1 {
+                    graph
+                        .add_edge(
+                            (id_map[&(i, j)], id_map[&(i + 1, j)]),
+                            (self.ew_generator)(),
+                        )
+                        .unwrap();
                 }
                 if i > 0 {
-                    graph.add_edge((id_map[&(i, j)], id_map[&(i - 1, j)]), (self.ew_generator)()).unwrap();
+                    graph
+                        .add_edge(
+                            (id_map[&(i, j)], id_map[&(i - 1, j)]),
+                            (self.ew_generator)(),
+                        )
+                        .unwrap();
                 }
                 if j < self.size.1 - 1 {
-                    graph.add_edge((id_map[&(i, j)], id_map[&(i, j + 1)]), (self.ew_generator)()).unwrap();
+                    graph
+                        .add_edge(
+                            (id_map[&(i, j)], id_map[&(i, j + 1)]),
+                            (self.ew_generator)(),
+                        )
+                        .unwrap();
                 }
                 if j > 0 {
-                    graph.add_edge((id_map[&(i, j)], id_map[&(i, j - 1)]), (self.ew_generator)()).unwrap();
+                    graph
+                        .add_edge(
+                            (id_map[&(i, j)], id_map[&(i, j - 1)]),
+                            (self.ew_generator)(),
+                        )
+                        .unwrap();
                 }
             }
         }
@@ -65,4 +88,3 @@ impl<'a, Nw: 'static + Clone, Ew: 'static + Clone> Generate<Nw, Ew> for Grid<'a,
         Box::new(graph)
     }
 }
-

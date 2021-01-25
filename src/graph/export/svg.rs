@@ -1,11 +1,10 @@
 use crate::graph::WeightedGraph;
-use crate::util::{ Point, scale::PointScaler };
+use crate::util::{scale::PointScaler, Point};
 
-use tera::Context;
-use tera::Tera;
 use std::fs::File;
 use std::io::prelude::*;
-
+use tera::Context;
+use tera::Tera;
 
 pub struct SVG {
     pub width: usize,
@@ -24,7 +23,11 @@ impl SVG {
         }
     }
 
-    pub fn export_coordinate_graph<Nw, Ew>(&self, graph: &dyn WeightedGraph<(Point, Nw), Ew>, name: &str) -> String {
+    pub fn export_coordinate_graph<Nw, Ew>(
+        &self,
+        graph: &dyn WeightedGraph<(Point, Nw), Ew>,
+        name: &str,
+    ) -> String {
         let mut context = Context::new();
 
         context.insert("name", &name);
@@ -35,13 +38,14 @@ impl SVG {
         let point_iter = graph.iter_nodes().map(|(_, weight)| weight.0);
         let scaler = PointScaler::from_point_iterator(point_iter);
 
-
-        let nodes: Vec<(Point, &str)> = graph.iter_nodes()
+        let nodes: Vec<(Point, &str)> = graph
+            .iter_nodes()
             .map(|(_, weight)| (self.scaled_point(&weight.0, &scaler), "black"))
             .collect();
         // let nodes = Vec::<(Point, &str)>::new();
 
-        let paths: Vec<(String, &str)> = graph.iter_edge_ids()
+        let paths: Vec<(String, &str)> = graph
+            .iter_edge_ids()
             .map(|(f_id, t_id)| {
                 let p1 = self.scaled_point(&graph.node_weight(f_id).unwrap().0, &scaler);
                 let p2 = self.scaled_point(&graph.node_weight(t_id).unwrap().0, &scaler);
@@ -57,5 +61,4 @@ impl SVG {
         reader.read_to_string(&mut template).unwrap();
         Tera::one_off(&template, &context, true).expect("Could not draw graph")
     }
-
 }

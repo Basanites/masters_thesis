@@ -1,5 +1,5 @@
-mod scaler;
 mod point_scaler;
+mod scaler;
 
-pub use scaler::Scaler;
 pub use point_scaler::PointScaler;
+pub use scaler::Scaler;
