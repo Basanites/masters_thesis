@@ -171,6 +171,7 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn iter_neighbors(
         &self,
         id: usize,
@@ -196,14 +197,14 @@ impl<Nw: Clone, Ew: Clone> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<N
     fn add_node(&mut self, id: usize, weight: Nw) -> Result<(), GraphError<usize>> {
         if self.node_weights.len() > id && self.has_node(id) {
             return Err(GraphError::DuplicateNode(id));
-        } else if self.node_weights.len() < id {
+        } else if self.node_weights.len() <= id {
             // Resizing here will never shrink the array, because has_node() implies id >= node_weights.len().
             // However calling this every time is slower than checking if the array needs to be resized.
             // Possible empty spots in between will be initialized with None.
-            self.node_weights.resize_with(id + 1, || None);
-            self.adjacency_matrix.resize_with(id + 1, || vec![None; id]);
+            self.node_weights.resize_with(id + 2, || None);
+            self.adjacency_matrix.resize_with(id + 2, || vec![None; id]);
             for edge_weights in self.adjacency_matrix.iter_mut() {
-                edge_weights.resize_with(id + 1, || None);
+                edge_weights.resize_with(id + 2, || None);
             }
         }
 

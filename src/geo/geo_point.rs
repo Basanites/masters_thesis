@@ -1,21 +1,19 @@
+use serde::Serialize;
+use std::cmp::Ordering;
 use std::f64::consts::PI;
 use std::hash::{Hash, Hasher};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize)]
 pub struct GeoPoint {
-    micro_lat: u32,
-    micro_lon: u32,
-    lat_rad: f64,
-    lon_rad: f64,
+    micro_lat: i64,
+    micro_lon: i64,
 }
 
 impl GeoPoint {
-    pub fn from_micro_degrees(micro_lat: u32, micro_lon: u32) -> Self {
+    pub fn from_micro_degrees(micro_lat: i64, micro_lon: i64) -> Self {
         GeoPoint {
             micro_lat,
             micro_lon,
-            lat_rad: degrees_to_radians(from_micro_scale(micro_lat)),
-            lon_rad: degrees_to_radians(from_micro_scale(micro_lon)),
         }
     }
 
@@ -23,8 +21,6 @@ impl GeoPoint {
         GeoPoint {
             micro_lat: to_micro_scale(lat),
             micro_lon: to_micro_scale(lon),
-            lat_rad: degrees_to_radians(lat),
-            lon_rad: degrees_to_radians(lon),
         }
     }
 
@@ -32,8 +28,6 @@ impl GeoPoint {
         GeoPoint {
             micro_lat: to_micro_scale(degrees_to_radians(lat_rad)),
             micro_lon: to_micro_scale(degrees_to_radians(lon_rad)),
-            lat_rad,
-            lon_rad,
         }
     }
 
@@ -46,25 +40,25 @@ impl GeoPoint {
     }
 
     pub fn lat_rad(&self) -> f64 {
-        self.lat_rad
+        degrees_to_radians(from_micro_scale(self.micro_lat()))
     }
 
     pub fn lon_rad(&self) -> f64 {
-        self.lon_rad
+        degrees_to_radians(from_micro_scale(self.micro_lon()))
     }
 
-    pub fn micro_lat(&self) -> u32 {
+    pub fn micro_lat(&self) -> i64 {
         self.micro_lat
     }
 
-    pub fn micro_lon(&self) -> u32 {
+    pub fn micro_lon(&self) -> i64 {
         self.micro_lon
     }
 }
 
 impl Hash for GeoPoint {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        (self.micro_lat, self.micro_lon).hash(hasher)
+        (self.micro_lat(), self.micro_lon()).hash(hasher)
     }
 }
 
@@ -74,20 +68,98 @@ impl PartialEq for GeoPoint {
     }
 }
 
+impl PartialOrd for GeoPoint {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for GeoPoint {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.micro_lat
+            .cmp(&other.micro_lat)
+            .then(self.micro_lon.cmp(&other.micro_lon))
+    }
+}
+
 impl Eq for GeoPoint {}
 
 fn degrees_to_radians(degrees: f64) -> f64 {
     degrees * PI / 180.0
 }
 
+#[allow(dead_code)]
 fn radians_to_degrees(radians: f64) -> f64 {
     radians * 180.0 / PI
 }
 
-fn to_micro_scale(val: f64) -> u32 {
-    (val * 1000000.0) as u32
+fn to_micro_scale(val: f64) -> i64 {
+    (val * 1000000.0) as i64
 }
 
-fn from_micro_scale(val: u32) -> f64 {
+fn from_micro_scale(val: i64) -> f64 {
     (val as f64) / 1000000.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use float_cmp::approx_eq;
+
+    #[test]
+    fn from_micro_degrees_works() {
+        let point = GeoPoint::from_micro_degrees(12345000, 54321000);
+
+        assert_eq!(point.micro_lat, 12345000);
+        assert_eq!(point.micro_lon, 54321000);
+    }
+
+    #[test]
+    fn from_degrees_works() {
+        let point = GeoPoint::from_degrees(12.345, 54.321);
+
+        assert_eq!(point.micro_lat, 12345000);
+        assert_eq!(point.micro_lon, 54321000);
+    }
+
+    #[test]
+    fn from_rads_works() {}
+
+    #[test]
+    fn lat_works() {
+        let point = GeoPoint::from_micro_degrees(12345000, 54321000);
+
+        assert!(approx_eq!(f64, point.lat(), 12.345));
+    }
+
+    #[test]
+    fn lon_works() {
+        let point = GeoPoint::from_micro_degrees(12345000, 54321000);
+
+        assert!(approx_eq!(f64, point.lon(), 54.321));
+    }
+
+    #[test]
+    fn micro_lat_works() {
+        let point = GeoPoint::from_micro_degrees(12345000, 54321000);
+
+        assert_eq!(point.micro_lat(), 12345000);
+    }
+
+    #[test]
+    fn micro_lon_works() {
+        let point = GeoPoint::from_micro_degrees(12345000, 54321000);
+
+        assert_eq!(point.micro_lon(), 54321000);
+    }
+
+    #[test]
+    fn from_micro_scale_works() {
+        assert_eq!(from_micro_scale(12670000), 12.67);
+    }
+
+    #[test]
+    fn to_micro_scale_works() {
+        assert_eq!(to_micro_scale(12.67), 12670000)
+    }
 }

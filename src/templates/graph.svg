@@ -24,4 +24,7 @@
   {% for tuple in points %}
     <circle cx="{{tuple.0.x}}" cy="{{tuple.0.y}}" r="2.0" stroke="{{tuple.1}}" />
   {% endfor %}
+  {% for tuple in geopoints %}
+    <circle cx="{{tuple.0.lat}}" cy="{{tuple.0.lon}}" r="2.0" stroke="{{tuple.1}}" />
+  {% endfor %}
 </svg>

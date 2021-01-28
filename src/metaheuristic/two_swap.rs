@@ -1,4 +1,4 @@
-use crate::graph::{Edge, GenericWeightedGraph};
+use crate::graph::GenericWeightedGraph;
 use crate::metaheuristic::{solution_length, Solution};
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
@@ -181,7 +181,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph::{regular::MatrixGraph, GenericWeightedGraph};
+    use crate::graph::regular::MatrixGraph;
 
     fn weighted_graph() -> MatrixGraph<f64, f64> {
         MatrixGraph::new(
@@ -211,7 +211,8 @@ mod tests {
         let eval: fn(f64, f64) -> f64 = |nw, ew| nw;
         let optimizer = TwoSwap::new(Box::new(graph), 0, 100.0, &eval);
         let solution = optimizer.current_solution();
-        assert_eq!(solution.0, &vec![(0, 3), (3, 0)]);
+        let correct = Solution::from_edges(vec![(0, 3), (3, 0)]).unwrap();
+        assert_eq!(solution.0, &correct);
         assert_eq!(solution.1, 7.0);
     }
 
@@ -222,8 +223,9 @@ mod tests {
         let mut optimizer = TwoSwap::new(Box::new(graph), 0, 100.0, &eval);
         let _ = optimizer.single_iteration();
         let solution = optimizer.current_solution();
+        let correct = Solution::<usize>::from_edges(vec![(0, 1), (1, 3), (3, 0)]).unwrap();
 
-        assert_eq!(solution.0, &vec![(0, 1), (1, 3), (3, 0)]);
+        assert_eq!(solution.0, &correct);
         assert_eq!(solution.1, 7.8);
     }
 }
