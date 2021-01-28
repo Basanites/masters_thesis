@@ -46,6 +46,7 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
 
     /// Returns an iterator over the neighbor ids with a reference to that edges weight
     /// Returns an error if the node is not in the graph.
+    #[allow(clippy::type_complexity)]
     fn iter_neighbors(
         &self,
         id: IndexType,

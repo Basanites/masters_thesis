@@ -17,3 +17,19 @@ pub fn geodistance_haversine(point_a: GeoPoint, point_b: GeoPoint) -> f64 {
         .sqrt()
         .asin()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geo::GeoPoint;
+
+    #[test]
+    fn geodistance_haversine_works() {
+        let p1 = GeoPoint::from_degrees(51.350205, 12.4973972);
+        let p2 = GeoPoint::from_degrees(51.3308595, 12.3130661);
+        let dist = geodistance_haversine(p1, p2);
+
+        assert!(dist >= 12.983);
+        assert!(dist <= 12.984);
+    }
+}

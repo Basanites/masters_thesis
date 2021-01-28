@@ -3,6 +3,7 @@ use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 
+#[allow(clippy::borrowed_box)]
 pub fn solution_length<IndexType, Nw, Ew>(
     solution: &Solution<IndexType>,
     graph: &Box<dyn GenericWeightedGraph<IndexType, Nw, Ew>>,
@@ -28,9 +29,18 @@ pub enum SolutionError<IndexType: PartialEq> {
     InvalidStartingNode(IndexType),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Solution<IndexType> {
     node_list: Vec<IndexType>,
+}
+
+impl<IndexType> Default for Solution<IndexType>
+where
+    IndexType: PartialEq + Copy,
+{
+    fn default() -> Self {
+        Solution::new()
+    }
 }
 
 impl<IndexType> Solution<IndexType>
@@ -59,12 +69,17 @@ where
     }
 
     pub fn push_edge(&mut self, edge: Edge<IndexType>) -> Result<(), SolutionError<IndexType>> {
+        // If we are looking at the first node our list will be empty.
+        // Thus we need to initialize it with this edge.
         if let Some(last) = self.node_list.last() {
             if last != &edge.0 {
                 return Err(SolutionError::InvalidStartingNode(edge.0));
             } else {
                 self.node_list.push(edge.1);
             }
+        } else {
+            self.node_list.push(edge.0);
+            self.node_list.push(edge.1);
         }
 
         Ok(())
@@ -134,6 +149,40 @@ mod tests {
         let solution = valid_solution();
 
         assert!(solution.iter_edges().eq(edge_it));
+    }
+
+    #[test]
+    fn nodes_works() {
+        let node_list = node_list();
+        let solution = valid_solution();
+
+        assert_eq!(solution.nodes(), node_list);
+    }
+
+    #[test]
+    fn edges_works() {
+        let node_list = node_list();
+        let edges: Vec<Edge<usize>> = node_list
+            .iter()
+            .zip(node_list.iter().skip(1))
+            .map(|(a, b)| (*a, *b))
+            .collect();
+        let solution = valid_solution();
+
+        assert_eq!(solution.edges(), edges);
+    }
+
+    #[test]
+    fn from_edges_works() {
+        let node_list = node_list();
+        let edges: Vec<Edge<usize>> = node_list
+            .iter()
+            .zip(node_list.iter().skip(1))
+            .map(|(a, b)| (*a, *b))
+            .collect();
+        let solution = Solution::from_edges(edges.clone()).unwrap();
+
+        assert_eq!(solution.edges(), edges);
     }
 
     #[test]
