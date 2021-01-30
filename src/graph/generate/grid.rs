@@ -1,5 +1,5 @@
 use super::Generate;
-use crate::graph::{regular::MatrixGraph, GenericWeightedGraph, WeightedGraph};
+use crate::graph::{GenericWeightedGraph, MatrixGraph, WeightedGraph};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
@@ -31,9 +31,9 @@ impl<'a, Nw: Clone, Ew: Clone> Grid<'a, Nw, Ew> {
 
 /// 'static lifetime needed here. See https://stackoverflow.com/questions/32625583/parameter-type-may-not-live-long-enough for explanation.
 /// tldr: Any type without stored references satisfies any lifetime. Thus e.g. all primitives satisfy 'static.
-impl<'a, Nw: 'static + Clone, Ew: 'static + Clone> Generate<Nw, Ew> for Grid<'a, Nw, Ew> {
+impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for Grid<'a, Nw, Ew> {
     fn generate(&self) -> Box<dyn WeightedGraph<Nw, Ew>> {
-        let mut graph = MatrixGraph::<Nw, Ew>::with_size(self.size.0 * self.size.1);
+        let mut graph = MatrixGraph::<usize, Nw, Ew>::with_size(self.size.0 * self.size.1);
 
         // count is used to generate consecutive numbered ids.
         // This means we need to remember which id an abstract (i, j) edge corresponds to.

@@ -1,5 +1,5 @@
 use super::Generate;
-use crate::graph::{regular::MatrixGraph, GenericWeightedGraph, WeightedGraph};
+use crate::graph::{GenericWeightedGraph, MatrixGraph, WeightedGraph};
 
 use rand::{thread_rng, Rng};
 
@@ -30,12 +30,10 @@ impl<'a, Nw: Clone, Ew: Clone> StochasticBlock<'a, Nw, Ew> {
     }
 }
 
-impl<'a, Nw: 'static + Clone, Ew: 'static + Clone> Generate<Nw, Ew>
-    for StochasticBlock<'a, Nw, Ew>
-{
+impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for StochasticBlock<'a, Nw, Ew> {
     fn generate(&self) -> Box<dyn WeightedGraph<Nw, Ew>> {
         let size = self.community_size * self.probability_matrix.len();
-        let mut graph = MatrixGraph::<Nw, Ew>::with_size(size);
+        let mut graph = MatrixGraph::<usize, Nw, Ew>::with_size(size);
         let mut rng = thread_rng();
 
         // Populate nodes with random weights in range.

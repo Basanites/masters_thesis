@@ -181,10 +181,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph::regular::MatrixGraph;
+    use crate::graph::MatrixGraph;
 
-    fn weighted_graph() -> MatrixGraph<f64, f64> {
-        MatrixGraph::new(
+    fn weighted_graph() -> MatrixGraph<usize, f64, f64> {
+        MatrixGraph::new_usize_indexed(
             vec![0.0, 0.8, 12.0, 7.0, 2.5],
             vec![
                 (0, 1, 12.0),

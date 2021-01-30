@@ -1,4 +1,4 @@
-#![feature(test)]
+#![feature(test, min_specialization)]
 mod geo;
 mod graph;
 mod metaheuristic;
@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::Write;
 
 fn main() -> std::io::Result<()> {
-    let graph = graph::regular::MatrixGraph::new(
+    let graph = graph::MatrixGraph::new_usize_indexed(
         vec![0.0, 0.8, 12.0, 7.0, 2.5],
         vec![
             (0, 1, 12.0),
