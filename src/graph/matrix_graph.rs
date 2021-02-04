@@ -528,6 +528,17 @@ where
         }
     }
 
+    default fn neighbors(
+        &self,
+        id: IndexType,
+    ) -> Result<Vec<(IndexType, &Ew)>, GraphError<IndexType>> {
+        let res = self.iter_neighbors(id);
+        match res {
+            Ok(iter) => Ok(iter.collect()),
+            Err(e) => Err(e),
+        }
+    }
+
     default fn has_node(&self, id: IndexType) -> bool {
         self.node_map.contains_key(&id) && self._has_node(self.node_map[&id])
     }

@@ -1,7 +1,6 @@
 use super::Generate;
 use crate::graph::{GenericWeightedGraph, MatrixGraph, WeightedGraph};
-
-use rand::{thread_rng, Rng};
+use crate::rng::preseeded_rng64;
 
 pub struct ErdosRenyi<'a, Nw, Ew>
 where
@@ -32,7 +31,7 @@ impl<'a, Nw: Clone, Ew: Clone> ErdosRenyi<'a, Nw, Ew> {
 
 impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for ErdosRenyi<'a, Nw, Ew> {
     fn generate(&self) -> Box<dyn WeightedGraph<Nw, Ew>> {
-        let mut rng = thread_rng();
+        let mut rng = preseeded_rng64();
         let mut graph = MatrixGraph::<usize, Nw, Ew>::with_size(self.size);
 
         // Populate nodes with random weights in range.
@@ -44,7 +43,7 @@ impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for ErdosRenyi
         // Populate edges with given probablity and weight in specified range.
         for i in 0..self.size {
             for j in 0..self.size {
-                if rng.gen_range(0.0, 1.0) <= self.connection_probability {
+                if rng.rand_float() <= self.connection_probability {
                     // Unwrapping is fine, because all nodes in the range were just created.
                     graph.add_edge((i, j), (self.ew_generator)()).unwrap();
                 }

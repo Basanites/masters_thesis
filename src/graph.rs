@@ -53,6 +53,8 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
         id: IndexType,
     ) -> Result<Box<dyn Iterator<Item = (IndexType, &Ew)> + '_>, GraphError<IndexType>>;
 
+    fn neighbors(&self, id: IndexType) -> Result<Vec<(IndexType, &Ew)>, GraphError<IndexType>>;
+
     /// Returns true if node with id is a member, or false otherwise.
     fn has_node(&self, id: IndexType) -> bool;
 

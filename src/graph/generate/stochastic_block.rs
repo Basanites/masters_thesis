@@ -1,7 +1,6 @@
 use super::Generate;
 use crate::graph::{GenericWeightedGraph, MatrixGraph, WeightedGraph};
-
-use rand::{thread_rng, Rng};
+use crate::rng::preseeded_rng64;
 
 pub struct StochasticBlock<'a, Nw, Ew>
 where
@@ -34,7 +33,7 @@ impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for Stochastic
     fn generate(&self) -> Box<dyn WeightedGraph<Nw, Ew>> {
         let size = self.community_size * self.probability_matrix.len();
         let mut graph = MatrixGraph::<usize, Nw, Ew>::with_size(size);
-        let mut rng = thread_rng();
+        let mut rng = preseeded_rng64();
 
         // Populate nodes with random weights in range.
         for i in 0..size {
@@ -45,7 +44,7 @@ impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for Stochastic
         // Populate edges with given probablity and weight in specified range.
         for i in 0..size {
             for j in 0..size {
-                if rng.gen_range(0.0, 1.0)
+                if rng.rand_float()
                     <= self.probability_matrix[i % self.community_size][j % self.community_size]
                 {
                     // Unwrapping is fine, because all nodes in the range were just created.

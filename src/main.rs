@@ -2,12 +2,13 @@
 mod geo;
 mod graph;
 mod metaheuristic;
+mod rng;
 mod util;
 
 use graph::export::SVG;
 use graph::import::import_pbf;
 use graph::{Edge, GenericWeightedGraph, WeightedGraph};
-use metaheuristic::TwoSwap;
+use metaheuristic::{two_swap, Metaheuristic, ProblemInstance, TwoSwap};
 use util::Point;
 
 use std::fs::File;
@@ -34,8 +35,11 @@ fn main() -> std::io::Result<()> {
     )
     .unwrap();
 
-    let eval: fn(f64, f64) -> f64 = |nw, ew| nw;
-    let mut optimizer = TwoSwap::new(Box::new(graph), 0, 100.0, &eval);
+    let eval: fn(f64, f64, usize, f64) -> f64 = |nw, _, _, _| nw;
+    let mut optimizer = TwoSwap::new(
+        ProblemInstance::new(Box::new(graph), 0, 100.0),
+        two_swap::Params::new(&eval),
+    );
     println!("{:?}", optimizer.current_solution());
     for _ in 1..5 {
         let val = optimizer.next();
