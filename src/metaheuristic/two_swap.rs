@@ -13,16 +13,15 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Sub, SubAssign};
 
 pub struct TwoSwap<'a, IndexType, Nw, Ew> {
-    graph: Box<dyn GenericWeightedGraph<IndexType, Nw, Ew>>,
+    graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
     goal_point: IndexType,
-    heuristic: &'a Heuristic<IndexType, Nw, Ew>,
+    heuristic: Heuristic<IndexType, Nw, Ew>,
     max_time: Ew,
     best_solution: Solution<IndexType>,
     best_score: f64,
     best_length: Ew,
 }
 
-#[allow(clippy::eq_op)]
 impl<'a, IndexType, Nw, Ew> TwoSwap<'a, IndexType, Nw, Ew>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
@@ -87,7 +86,7 @@ where
             self.best_solution.push_node(solution.0);
             self.best_solution.push_node(self.goal_point);
             self.best_score = solution.1;
-            self.best_length = solution_length(&self.best_solution, &self.graph).unwrap();
+            self.best_length = solution_length(&self.best_solution, self.graph).unwrap();
         }
     }
 
@@ -96,7 +95,7 @@ where
     }
 }
 
-impl<'a, IndexType, Nw, Ew> Metaheuristic<Params<'a, IndexType, Nw, Ew>, IndexType, Nw, Ew>
+impl<'a, IndexType, Nw, Ew> Metaheuristic<'a, Params<IndexType, Nw, Ew>, IndexType, Nw, Ew>
     for TwoSwap<'a, IndexType, Nw, Ew>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
@@ -112,8 +111,8 @@ where
         + Div<Output = Ew>,
 {
     fn new(
-        problem: ProblemInstance<IndexType, Nw, Ew>,
-        params: Params<'a, IndexType, Nw, Ew>,
+        problem: ProblemInstance<'a, IndexType, Nw, Ew>,
+        params: Params<IndexType, Nw, Ew>,
     ) -> Self {
         let mut swap = TwoSwap {
             graph: problem.graph,
@@ -255,10 +254,9 @@ mod tests {
     #[test]
     fn initialization_works() {
         let graph = weighted_graph();
-        let eval: fn(f64, f64, usize, f64) -> f64 = |nw, _, _, _| nw;
         let optimizer = TwoSwap::new(
-            ProblemInstance::new(Box::new(graph), 0, 100.0),
-            Params::new(&eval),
+            ProblemInstance::new(&graph, 0, 100.0),
+            Params::new(|nw, _, _, _| nw),
         );
         let solution = optimizer.current_solution();
         let correct = Solution::from_edges(vec![(0, 3), (3, 0)]).unwrap();
@@ -269,10 +267,9 @@ mod tests {
     #[test]
     fn single_iteration_works() {
         let graph = weighted_graph();
-        let eval: fn(f64, f64, usize, f64) -> f64 = |nw, _, _, _| nw;
         let mut optimizer = TwoSwap::new(
-            ProblemInstance::new(Box::new(graph), 0, 100.0),
-            Params::new(&eval),
+            ProblemInstance::new(&graph, 0, 100.0),
+            Params::new(|nw, _, _, _| nw),
         );
         let _ = optimizer.single_iteration();
         let solution = optimizer.current_solution();

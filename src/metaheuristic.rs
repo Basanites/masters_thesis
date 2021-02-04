@@ -14,20 +14,20 @@ pub type Heuristic<IndexType, Nw, Ew> = fn(
     elapsed_time_ratio_until: Ew,
 ) -> f64;
 
-pub trait Metaheuristic<Params, IndexType, Nw, Ew> {
-    fn new(problem: ProblemInstance<IndexType, Nw, Ew>, params: Params) -> Self;
+pub trait Metaheuristic<'a, Params, IndexType, Nw, Ew> {
+    fn new(problem: ProblemInstance<'a, IndexType, Nw, Ew>, params: Params) -> Self;
     fn single_iteration(&mut self) -> Option<&Solution<IndexType>>;
 }
 
-pub struct ProblemInstance<IndexType, Nw, Ew> {
-    graph: Box<dyn GenericWeightedGraph<IndexType, Nw, Ew>>,
+pub struct ProblemInstance<'a, IndexType, Nw, Ew> {
+    graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
     goal_point: IndexType,
     max_time: Ew,
 }
 
-impl<IndexType, Nw, Ew> ProblemInstance<IndexType, Nw, Ew> {
+impl<'a, IndexType, Nw, Ew> ProblemInstance<'a, IndexType, Nw, Ew> {
     pub fn new(
-        graph: Box<dyn GenericWeightedGraph<IndexType, Nw, Ew>>,
+        graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
         goal_point: IndexType,
         max_time: Ew,
     ) -> Self {

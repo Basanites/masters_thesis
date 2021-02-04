@@ -37,8 +37,8 @@ fn main() -> std::io::Result<()> {
 
     let eval: fn(f64, f64, usize, f64) -> f64 = |nw, _, _, _| nw;
     let mut optimizer = TwoSwap::new(
-        ProblemInstance::new(Box::new(graph), 0, 100.0),
-        two_swap::Params::new(&eval),
+        ProblemInstance::new(&graph, 0, 100.0),
+        two_swap::Params::new(eval),
     );
     println!("{:?}", optimizer.current_solution());
     for _ in 1..5 {

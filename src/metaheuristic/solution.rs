@@ -3,10 +3,9 @@ use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 
-#[allow(clippy::borrowed_box)]
 pub fn solution_length<IndexType, Nw, Ew>(
     solution: &Solution<IndexType>,
-    graph: &Box<dyn GenericWeightedGraph<IndexType, Nw, Ew>>,
+    graph: &dyn GenericWeightedGraph<IndexType, Nw, Ew>,
 ) -> Result<Ew, GraphError<IndexType>>
 where
     IndexType: PartialEq + Copy + Debug,
