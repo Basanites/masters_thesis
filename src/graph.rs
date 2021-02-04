@@ -4,10 +4,11 @@ pub mod export;
 pub mod generate;
 pub mod geo;
 pub mod import;
-pub mod regular;
+mod matrix_graph;
 
 use crate::geo::GeoPoint;
 pub use error::GraphError;
+pub use matrix_graph::MatrixGraph;
 
 pub type Edge<IndexType> = (IndexType, IndexType);
 
@@ -21,7 +22,7 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
     /// Returns the number of edges in this graph.
     fn size(&self) -> usize;
 
-    /// Returns an iterator over noe ids.
+    /// Returns an iterator over node ids.
     fn iter_node_ids(&self) -> Box<dyn Iterator<Item = IndexType> + '_>;
 
     /// Returns the node ids of this graph.
@@ -51,6 +52,8 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
         &self,
         id: IndexType,
     ) -> Result<Box<dyn Iterator<Item = (IndexType, &Ew)> + '_>, GraphError<IndexType>>;
+
+    fn neighbors(&self, id: IndexType) -> Result<Vec<(IndexType, &Ew)>, GraphError<IndexType>>;
 
     /// Returns true if node with id is a member, or false otherwise.
     fn has_node(&self, id: IndexType) -> bool;

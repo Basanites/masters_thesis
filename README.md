@@ -18,7 +18,9 @@ Project is created with:
 * [osmpbfreader](https://crates.io/crates/osmpbfreader) to parse OpenStreetMaps data.
 * [Tera](https://crates.io/crates/tera) for export to SVG format.
 * [Serde](https://crates.io/crates/serde) to serialize graphdata.
-* [Rand](https://crates.io/crates/rand) for creation of random graph instances as well as modification of existing ones.
+* [oorandom](https://crates.io/crates/oorandom) for random decision making in ACO, as well as for random graph generation.
+* [getrandom](https://crates.io/crates/getrandom) for seeding of oorandom rngs.
+* [num-traits](https://crates.io/crates/num-traits) specifically for specification of types with additive zero elements.
 * [float-cmp](https://crates.io/crates/float-cmp) to compare float variables.
 	
 ## Setup

@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 
 use crate::geo::{geodistance_haversine, GeoPoint};
-use crate::graph::{regular::MatrixGraph, GenericWeightedGraph};
+use crate::graph::{GenericWeightedGraph, MatrixGraph};
 use crate::util::Point;
 
 /// Calculates the distance between two nodes in km.
@@ -205,7 +205,7 @@ fn contract_nodes(
 
 /// Creates a minimized MatrixGraph from a given pbf file.
 /// The nodes are contracted as to not run out of memory for the MatrixGraph.
-pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64> {
+pub fn import_pbf(path: &str) -> MatrixGraph<usize, (Point, usize), f64> {
     let mut pbf = OsmPbfReader::new(File::open(path).unwrap());
     let mut neighbors = HashMap::<OsmId, HashMap<OsmId, HashMap<String, f64>>>::new();
     let mut inv_neighbors = HashMap::<OsmId, Vec<OsmId>>::new();
@@ -296,7 +296,7 @@ pub fn import_pbf(path: &str) -> MatrixGraph<(Point, usize), f64> {
         }
     }
 
-    let mut mapped_graph = MatrixGraph::<(Point, usize), f64>::with_size(counter);
+    let mut mapped_graph = MatrixGraph::<usize, (Point, usize), f64>::with_size(counter);
 
     // Insert nodes into the graph with fixed weight 1
     for (id, &i) in &node_map {
