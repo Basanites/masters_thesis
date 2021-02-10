@@ -606,6 +606,10 @@ where
         }))
     }
 
+    default fn edges(&self) -> Vec<(Edge<IndexType>, &Ew)> {
+        self.iter_edges().collect()
+    }
+
     default fn edge_weight(&self, edge: Edge<IndexType>) -> Result<&Ew, GraphError<IndexType>> {
         let weight = self._edge_weight((self.node_map[&edge.0], self.node_map[&edge.1]));
         self.mapped_result(weight)

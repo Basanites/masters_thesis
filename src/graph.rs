@@ -83,6 +83,9 @@ pub trait GenericWeightedGraph<IndexType, Nw, Ew> {
     /// Returns an iterator over all edges with their according weights
     fn iter_edges(&self) -> Box<dyn Iterator<Item = (Edge<IndexType>, &Ew)> + '_>;
 
+    /// Returns a vec of all edges and a reference to their weights
+    fn edges(&self) -> Vec<(Edge<IndexType>, &Ew)>;
+
     /// Returns the weight of an edge.
     fn edge_weight(&self, edge: Edge<IndexType>) -> Result<&Ew, GraphError<IndexType>>;
 

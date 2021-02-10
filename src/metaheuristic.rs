@@ -4,7 +4,9 @@ pub mod two_swap;
 
 use crate::graph::GenericWeightedGraph;
 pub use aco::ACO;
-pub use solution::{solution_length, Solution, SolutionError};
+pub use solution::{
+    solution_length, solution_score, solution_score_and_length, Solution, SolutionError,
+};
 pub use two_swap::TwoSwap;
 
 pub type Heuristic<IndexType, Nw, Ew> = fn(
