@@ -5,13 +5,17 @@ pub use params::Params;
 
 use crate::graph::{Edge, GenericWeightedGraph, MatrixGraph};
 use crate::metaheuristic::{
-    solution_score_and_length, Heuristic, Metaheuristic, ProblemInstance, Solution,
+    solution_score_and_length, AcoMessage, AcoSupervisor, Heuristic, Metaheuristic,
+    ProblemInstance, Solution,
 };
+use crate::rng::rng64;
 
 use num_traits::identities::Zero;
+use oorandom::Rand64;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::time::Instant;
 
 pub struct ACO<'a, IndexType: Clone, Nw, Ew> {
     graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
@@ -28,6 +32,8 @@ pub struct ACO<'a, IndexType: Clone, Nw, Ew> {
     best_solution: Solution<IndexType>,
     best_score: Nw,
     best_length: Ew,
+    supervisor: AcoSupervisor<AcoMessage>,
+    rng: Rand64,
 }
 
 impl<'a, IndexType, Nw> ACO<'a, IndexType, Nw, f64>
@@ -54,7 +60,8 @@ where
     }
 }
 
-impl<'a, IndexType, Nw> Metaheuristic<'a, Params<IndexType, Nw, f64>, IndexType, Nw, f64>
+impl<'a, IndexType, Nw>
+    Metaheuristic<'a, Params<IndexType, Nw, f64>, IndexType, Nw, f64, AcoSupervisor<AcoMessage>>
     for ACO<'a, IndexType, Nw, f64>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
@@ -63,6 +70,7 @@ where
     fn new(
         problem: ProblemInstance<'a, IndexType, Nw, f64>,
         params: Params<IndexType, Nw, f64>,
+        supervisor: AcoSupervisor<AcoMessage>,
     ) -> Self {
         let graph = problem.graph;
         let pheromones = MatrixGraph::new(
@@ -92,21 +100,29 @@ where
             best_solution: Solution::new(),
             best_score: Nw::zero(),
             best_length: f64::zero(),
+            supervisor,
+            rng: rng64(params.seed),
         }
     }
 
     fn single_iteration(&mut self) -> Option<&Solution<IndexType>> {
+        let start_time = Instant::now();
         let ants = vec![
-            Ant::new(
-                self.graph,
-                &self.pheromone_matrix,
-                self.goal_point,
-                self.max_time,
-                &self.heuristic,
-                self.seed,
-                self.alpha,
-                self.beta,
-            );
+            {
+                let (sender, id) = self.supervisor.new_ant();
+                Ant::new(
+                    self.graph,
+                    &self.pheromone_matrix,
+                    self.goal_point,
+                    self.max_time,
+                    &self.heuristic,
+                    self.rng.rand_u64() as u128 + ((self.rng.rand_u64() as u128) << 64),
+                    self.alpha,
+                    self.beta,
+                    sender,
+                    id,
+                )
+            };
             self.ant_count
         ];
 
@@ -128,6 +144,8 @@ where
             }
         }
 
+        let duration = start_time.elapsed();
+        self.supervisor.reset();
         if best_score > self.best_score {
             self.pheromone_update(&best_solution, best_length);
             self.best_solution = best_solution;

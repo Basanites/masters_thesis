@@ -1,5 +1,5 @@
 use crate::graph::{GenericWeightedGraph, MatrixGraph};
-use crate::metaheuristic::{Heuristic, Solution};
+use crate::metaheuristic::{AcoMessage, Heuristic, Solution};
 use crate::rng::rng64;
 
 use num_traits::identities::Zero;
@@ -8,6 +8,8 @@ use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::sync::mpsc::Sender;
+use std::time::Instant;
 
 #[derive(Clone)]
 pub struct Ant<'a, IndexType: Clone, Nw, Ew> {
@@ -19,6 +21,8 @@ pub struct Ant<'a, IndexType: Clone, Nw, Ew> {
     beta: f64,
     rng_seed: u128,
     heuristic: &'a Heuristic<IndexType, Nw, Ew>,
+    sender: Sender<AcoMessage>,
+    id: usize,
 }
 
 impl<'a, IndexType, Nw> Ant<'a, IndexType, Nw, f64>
@@ -36,6 +40,8 @@ where
         rng_seed: u128,
         alpha: f64,
         beta: f64,
+        sender: Sender<AcoMessage>,
+        id: usize,
     ) -> Self {
         Ant {
             graph,
@@ -46,6 +52,8 @@ where
             rng_seed,
             alpha,
             beta,
+            sender,
+            id,
         }
     }
 
@@ -87,6 +95,8 @@ where
     }
 
     pub fn get_solution(&self) -> Solution<IndexType> {
+        let start_time = Instant::now();
+        let mut evals = 0;
         let mut rng = rng64(self.rng_seed);
         let mut solution = Solution::new();
         solution.push_node(self.goal_point);
@@ -126,6 +136,7 @@ where
                     tail_length,
                 );
                 sum += weighted_heuristic * f64::pow(*pheromone_level, self.alpha);
+                evals += 2; // we increment evals by 2 for each element, because we did not increment when calculating the weighted heuristic sum
 
                 // sum is bigger than the random value we generated, so we hit our node
                 // with the correct probability
@@ -142,6 +153,10 @@ where
             }
         }
 
+        // TODO: log errors from sending here
+        let _res = self
+            .sender
+            .send(AcoMessage::new(self.id, evals, start_time.elapsed()));
         solution
     }
 }

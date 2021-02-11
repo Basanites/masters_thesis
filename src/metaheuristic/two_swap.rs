@@ -2,7 +2,10 @@ mod params;
 pub use params::Params;
 
 use crate::graph::GenericWeightedGraph;
-use crate::metaheuristic::{solution_length, Heuristic, Metaheuristic, ProblemInstance, Solution};
+use crate::metaheuristic::{
+    solution_length, Heuristic, Metaheuristic, ProblemInstance, Solution, TwoSwapMessage,
+    TwoSwapSupervisor,
+};
 
 use num_traits::identities::Zero;
 use std::cmp::{Eq, PartialEq};
@@ -11,6 +14,7 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Sub, SubAssign};
+use std::time::Instant;
 
 pub struct TwoSwap<'a, IndexType, Nw, Ew> {
     graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
@@ -20,6 +24,8 @@ pub struct TwoSwap<'a, IndexType, Nw, Ew> {
     best_solution: Solution<IndexType>,
     best_score: f64,
     best_length: Ew,
+    pub supervisor: TwoSwapSupervisor<TwoSwapMessage>,
+    i: usize,
 }
 
 impl<'a, IndexType, Nw, Ew> TwoSwap<'a, IndexType, Nw, Ew>
@@ -64,6 +70,10 @@ where
     }
 
     pub fn initialize(&mut self) {
+        eprintln!("hello hello");
+        let tx = self.supervisor.sender();
+        let start_time = Instant::now();
+        let mut evals = 0;
         // we take the node with best score we can also get back from
         let max = self
             .graph
@@ -77,7 +87,7 @@ where
                         + self.score_edge(id, self.goal_point, Ew::zero()),
                 )
             })
-            .inspect(|x| println!("{:?}", x))
+            .inspect(|_| evals += 1)
             .max_by(|(_, ev_a), (_, ev_b)| ev_a.partial_cmp(ev_b).unwrap());
 
         // if there is no path back max will have no solution
@@ -88,6 +98,10 @@ where
             self.best_score = solution.1;
             self.best_length = solution_length(&self.best_solution, self.graph).unwrap();
         }
+
+        tx.send(TwoSwapMessage::new(self.i, evals, start_time.elapsed()))
+            .unwrap();
+        self.i += 1;
     }
 
     pub fn current_solution(&self) -> (&Solution<IndexType>, f64, Ew) {
@@ -95,8 +109,15 @@ where
     }
 }
 
-impl<'a, IndexType, Nw, Ew> Metaheuristic<'a, Params<IndexType, Nw, Ew>, IndexType, Nw, Ew>
-    for TwoSwap<'a, IndexType, Nw, Ew>
+impl<'a, IndexType, Nw, Ew>
+    Metaheuristic<
+        'a,
+        Params<IndexType, Nw, Ew>,
+        IndexType,
+        Nw,
+        Ew,
+        TwoSwapSupervisor<TwoSwapMessage>,
+    > for TwoSwap<'a, IndexType, Nw, Ew>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy,
@@ -113,6 +134,7 @@ where
     fn new(
         problem: ProblemInstance<'a, IndexType, Nw, Ew>,
         params: Params<IndexType, Nw, Ew>,
+        supervisor: TwoSwapSupervisor<TwoSwapMessage>,
     ) -> Self {
         let mut swap = TwoSwap {
             graph: problem.graph,
@@ -122,6 +144,8 @@ where
             best_solution: Solution::new(),
             best_score: 0.0,
             best_length: Ew::zero(),
+            supervisor,
+            i: 0,
         };
 
         swap.initialize();
@@ -129,6 +153,9 @@ where
     }
 
     fn single_iteration(&mut self) -> Option<&Solution<IndexType>> {
+        let tx = self.supervisor.sender();
+        let start_time = Instant::now();
+        let mut evals = 0;
         let mut new_best = Solution::from_nodes(vec![self.goal_point]);
         let mut head_length = self.best_length; // initialized to the 0 of Ew
         let mut tail_length = Ew::zero();
@@ -145,6 +172,7 @@ where
             max = if temp_visited.contains_key(to) {
                 0.0
             } else {
+                evals += 1;
                 self.score(*t_weight, original_distance, *to, tail_length)
             };
             let mut best_follow = *to;
@@ -154,6 +182,7 @@ where
                 temp_score = if temp_visited.contains_key(&nid) {
                     0.0
                 } else {
+                    evals += 1;
                     self.score_with_known_edge(nid, *weight, tail_length)
                 };
                 if let Ok(return_weight) = self.graph.edge_weight((nid, *to)) {
@@ -161,6 +190,7 @@ where
                     temp_score += if temp_visited.contains_key(to) {
                         0.0
                     } else {
+                        evals += 1;
                         self.score(*t_weight, *return_weight, *to, tail_length + *weight)
                     };
                     let new_distance =
@@ -187,6 +217,10 @@ where
             }
             score += max;
         }
+
+        tx.send(TwoSwapMessage::new(self.i, evals, start_time.elapsed()))
+            .unwrap();
+        self.i += 1;
 
         if score > self.best_score {
             println!("old score: {}, new score: {}", self.best_score, score);
@@ -257,6 +291,7 @@ mod tests {
         let optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, 100.0),
             Params::new(|nw, _, _, _| nw),
+            TwoSwapSupervisor::default(),
         );
         let solution = optimizer.current_solution();
         let correct = Solution::from_edges(vec![(0, 3), (3, 0)]).unwrap();
@@ -270,6 +305,7 @@ mod tests {
         let mut optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, 100.0),
             Params::new(|nw, _, _, _| nw),
+            TwoSwapSupervisor::default(),
         );
         let _ = optimizer.single_iteration();
         let solution = optimizer.current_solution();

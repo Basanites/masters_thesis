@@ -8,7 +8,9 @@ pub use aco::ACO;
 pub use solution::{
     solution_length, solution_score, solution_score_and_length, Solution, SolutionError,
 };
-pub use supervisor::AcoSupervisor;
+pub use supervisor::{
+    AcoMessage, AcoSupervisor, Message, MessageInfo, Supervisor, TwoSwapMessage, TwoSwapSupervisor,
+};
 pub use two_swap::TwoSwap;
 
 pub type Heuristic<IndexType, Nw, Ew> = fn(
@@ -18,8 +20,12 @@ pub type Heuristic<IndexType, Nw, Ew> = fn(
     elapsed_time_ratio_until: Ew,
 ) -> f64;
 
-pub trait Metaheuristic<'a, Params, IndexType, Nw, Ew> {
-    fn new(problem: ProblemInstance<'a, IndexType, Nw, Ew>, params: Params) -> Self;
+pub trait Metaheuristic<'a, Params, IndexType, Nw, Ew, SupervisorType> {
+    fn new(
+        problem: ProblemInstance<'a, IndexType, Nw, Ew>,
+        params: Params,
+        supervisor: SupervisorType,
+    ) -> Self;
     fn single_iteration(&mut self) -> Option<&Solution<IndexType>>;
 }
 
