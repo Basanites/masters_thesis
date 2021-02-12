@@ -1,12 +1,16 @@
 mod ant;
+mod message;
 mod params;
+mod supervisor;
+
 pub use ant::Ant;
+pub use message::Message;
 pub use params::Params;
+pub use supervisor::Supervisor;
 
 use crate::graph::{Edge, GenericWeightedGraph, MatrixGraph};
 use crate::metaheuristic::{
-    solution_score_and_length, AcoMessage, AcoSupervisor, Heuristic, Metaheuristic,
-    ProblemInstance, Solution,
+    solution_score_and_length, Heuristic, Metaheuristic, ProblemInstance, Solution,
 };
 use crate::rng::rng64;
 
@@ -32,7 +36,7 @@ pub struct ACO<'a, IndexType: Clone, Nw, Ew> {
     best_solution: Solution<IndexType>,
     best_score: Nw,
     best_length: Ew,
-    supervisor: AcoSupervisor<AcoMessage>,
+    supervisor: Supervisor,
     rng: Rand64,
 }
 
@@ -61,7 +65,7 @@ where
 }
 
 impl<'a, IndexType, Nw>
-    Metaheuristic<'a, Params<IndexType, Nw, f64>, IndexType, Nw, f64, AcoSupervisor<AcoMessage>>
+    Metaheuristic<'a, Params<IndexType, Nw, f64>, IndexType, Nw, f64, Supervisor>
     for ACO<'a, IndexType, Nw, f64>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
@@ -70,7 +74,7 @@ where
     fn new(
         problem: ProblemInstance<'a, IndexType, Nw, f64>,
         params: Params<IndexType, Nw, f64>,
-        supervisor: AcoSupervisor<AcoMessage>,
+        supervisor: Supervisor,
     ) -> Self {
         let graph = problem.graph;
         let pheromones = MatrixGraph::new(

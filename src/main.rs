@@ -8,7 +8,7 @@ mod util;
 use graph::export::SVG;
 use graph::import::import_pbf;
 use graph::{Edge, GenericWeightedGraph, WeightedGraph};
-use metaheuristic::{two_swap, Metaheuristic, ProblemInstance, TwoSwap, TwoSwapSupervisor};
+use metaheuristic::{two_swap, Metaheuristic, ProblemInstance, TwoSwap};
 use util::Point;
 
 use std::fs::File;
@@ -39,7 +39,7 @@ fn main() -> std::io::Result<()> {
     let mut optimizer = TwoSwap::new(
         ProblemInstance::new(&graph, 0, 100.0),
         two_swap::Params::new(eval),
-        TwoSwapSupervisor::default(),
+        two_swap::Supervisor::default(),
     );
     println!("{:?}", optimizer.current_solution());
     for _ in 1..5 {

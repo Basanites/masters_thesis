@@ -1,11 +1,13 @@
+mod message;
 mod params;
+mod supervisor;
+
+pub use message::Message;
 pub use params::Params;
+pub use supervisor::Supervisor;
 
 use crate::graph::GenericWeightedGraph;
-use crate::metaheuristic::{
-    solution_length, Heuristic, Metaheuristic, ProblemInstance, Solution, TwoSwapMessage,
-    TwoSwapSupervisor,
-};
+use crate::metaheuristic::{solution_length, Heuristic, Metaheuristic, ProblemInstance, Solution};
 
 use num_traits::identities::Zero;
 use std::cmp::{Eq, PartialEq};
@@ -24,7 +26,7 @@ pub struct TwoSwap<'a, IndexType, Nw, Ew> {
     best_solution: Solution<IndexType>,
     best_score: f64,
     best_length: Ew,
-    pub supervisor: TwoSwapSupervisor<TwoSwapMessage>,
+    pub supervisor: Supervisor,
     i: usize,
 }
 
@@ -99,7 +101,7 @@ where
             self.best_length = solution_length(&self.best_solution, self.graph).unwrap();
         }
 
-        tx.send(TwoSwapMessage::new(self.i, evals, start_time.elapsed()))
+        tx.send(Message::new(self.i, evals, start_time.elapsed()))
             .unwrap();
         self.i += 1;
     }
@@ -110,14 +112,8 @@ where
 }
 
 impl<'a, IndexType, Nw, Ew>
-    Metaheuristic<
-        'a,
-        Params<IndexType, Nw, Ew>,
-        IndexType,
-        Nw,
-        Ew,
-        TwoSwapSupervisor<TwoSwapMessage>,
-    > for TwoSwap<'a, IndexType, Nw, Ew>
+    Metaheuristic<'a, Params<IndexType, Nw, Ew>, IndexType, Nw, Ew, Supervisor>
+    for TwoSwap<'a, IndexType, Nw, Ew>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy,
@@ -134,7 +130,7 @@ where
     fn new(
         problem: ProblemInstance<'a, IndexType, Nw, Ew>,
         params: Params<IndexType, Nw, Ew>,
-        supervisor: TwoSwapSupervisor<TwoSwapMessage>,
+        supervisor: Supervisor,
     ) -> Self {
         let mut swap = TwoSwap {
             graph: problem.graph,
@@ -218,7 +214,7 @@ where
             score += max;
         }
 
-        tx.send(TwoSwapMessage::new(self.i, evals, start_time.elapsed()))
+        tx.send(Message::new(self.i, evals, start_time.elapsed()))
             .unwrap();
         self.i += 1;
 
@@ -291,7 +287,7 @@ mod tests {
         let optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, 100.0),
             Params::new(|nw, _, _, _| nw),
-            TwoSwapSupervisor::default(),
+            Supervisor::default(),
         );
         let solution = optimizer.current_solution();
         let correct = Solution::from_edges(vec![(0, 3), (3, 0)]).unwrap();
@@ -305,7 +301,7 @@ mod tests {
         let mut optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, 100.0),
             Params::new(|nw, _, _, _| nw),
-            TwoSwapSupervisor::default(),
+            Supervisor::default(),
         );
         let _ = optimizer.single_iteration();
         let solution = optimizer.current_solution();

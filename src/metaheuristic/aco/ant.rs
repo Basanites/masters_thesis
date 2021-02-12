@@ -1,5 +1,6 @@
 use crate::graph::{GenericWeightedGraph, MatrixGraph};
-use crate::metaheuristic::{AcoMessage, Heuristic, Solution};
+use crate::metaheuristic::aco::Message;
+use crate::metaheuristic::{Heuristic, Solution};
 use crate::rng::rng64;
 
 use num_traits::identities::Zero;
@@ -21,7 +22,7 @@ pub struct Ant<'a, IndexType: Clone, Nw, Ew> {
     beta: f64,
     rng_seed: u128,
     heuristic: &'a Heuristic<IndexType, Nw, Ew>,
-    sender: Sender<AcoMessage>,
+    sender: Sender<Message>,
     id: usize,
 }
 
@@ -40,7 +41,7 @@ where
         rng_seed: u128,
         alpha: f64,
         beta: f64,
-        sender: Sender<AcoMessage>,
+        sender: Sender<Message>,
         id: usize,
     ) -> Self {
         Ant {
@@ -116,6 +117,7 @@ where
                 .graph
                 .iter_neighbors(next_node)
                 .unwrap()
+                .inspect(|_| evals += 1) // increment evals for each call to heuristic
                 .fold(0.0, |acc, (to, weight)| {
                     acc + self.weighted_heuristic(to, *weight, tail_length)
                 });
@@ -136,7 +138,7 @@ where
                     tail_length,
                 );
                 sum += weighted_heuristic * f64::pow(*pheromone_level, self.alpha);
-                evals += 2; // we increment evals by 2 for each element, because we did not increment when calculating the weighted heuristic sum
+                evals += 1;
 
                 // sum is bigger than the random value we generated, so we hit our node
                 // with the correct probability
@@ -156,7 +158,7 @@ where
         // TODO: log errors from sending here
         let _res = self
             .sender
-            .send(AcoMessage::new(self.id, evals, start_time.elapsed()));
+            .send(Message::new(self.id, evals, start_time.elapsed()));
         solution
     }
 }

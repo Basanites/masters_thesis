@@ -1,15 +1,12 @@
 pub mod aco;
 mod solution;
-mod supervisor;
+pub mod supervisor;
 pub mod two_swap;
 
 use crate::graph::GenericWeightedGraph;
 pub use aco::ACO;
 pub use solution::{
     solution_length, solution_score, solution_score_and_length, Solution, SolutionError,
-};
-pub use supervisor::{
-    AcoMessage, AcoSupervisor, Message, MessageInfo, Supervisor, TwoSwapMessage, TwoSwapSupervisor,
 };
 pub use two_swap::TwoSwap;
 
