@@ -14,23 +14,24 @@ use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::io::Write;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Sub, SubAssign};
 use std::time::Instant;
 
-pub struct TwoSwap<'a, IndexType, Nw, Ew> {
+pub struct TwoSwap<'a, IndexType, Nw, Ew, W: Write> {
     graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
     goal_point: IndexType,
-    heuristic: Heuristic<IndexType, Nw, Ew>,
+    heuristic: &'a Heuristic<IndexType, Nw, Ew>,
     max_time: Ew,
     best_solution: Solution<IndexType>,
     best_score: f64,
     best_length: Ew,
-    pub supervisor: Supervisor,
+    pub supervisor: Supervisor<W>,
     i: usize,
 }
 
-impl<'a, IndexType, Nw, Ew> TwoSwap<'a, IndexType, Nw, Ew>
+impl<'a, IndexType, Nw, Ew, W> TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy,
@@ -43,6 +44,7 @@ where
         + PartialOrd
         + Sum
         + Div<Output = Ew>,
+    W: Write,
 {
     fn score(&self, node_weight: Nw, edge_weight: Ew, point: IndexType, distance_up_to: Ew) -> f64 {
         (self.heuristic)(
@@ -72,7 +74,6 @@ where
     }
 
     pub fn initialize(&mut self) {
-        eprintln!("hello hello");
         let tx = self.supervisor.sender();
         let start_time = Instant::now();
         let mut evals = 0;
@@ -101,7 +102,7 @@ where
             self.best_length = solution_length(&self.best_solution, self.graph).unwrap();
         }
 
-        tx.send(Message::new(self.i, evals, start_time.elapsed()))
+        tx.send(Message::new(self.i, evals, 0, 0, 0, start_time.elapsed()))
             .unwrap();
         self.i += 1;
     }
@@ -109,11 +110,16 @@ where
     pub fn current_solution(&self) -> (&Solution<IndexType>, f64, Ew) {
         (&self.best_solution, self.best_score, self.best_length)
     }
+
+    pub fn solve(&mut self) {
+        while self.next().is_some() {}
+        self.supervisor.aggregate_receive();
+    }
 }
 
-impl<'a, IndexType, Nw, Ew>
-    Metaheuristic<'a, Params<IndexType, Nw, Ew>, IndexType, Nw, Ew, Supervisor>
-    for TwoSwap<'a, IndexType, Nw, Ew>
+impl<'a, IndexType, Nw, Ew, W>
+    Metaheuristic<'a, Params<'a, IndexType, Nw, Ew>, IndexType, Nw, Ew, Supervisor<W>>
+    for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy,
@@ -126,11 +132,12 @@ where
         + PartialOrd
         + Sum
         + Div<Output = Ew>,
+    W: Write,
 {
     fn new(
         problem: ProblemInstance<'a, IndexType, Nw, Ew>,
-        params: Params<IndexType, Nw, Ew>,
-        supervisor: Supervisor,
+        params: Params<'a, IndexType, Nw, Ew>,
+        supervisor: Supervisor<W>,
     ) -> Self {
         let mut swap = TwoSwap {
             graph: problem.graph,
@@ -214,13 +221,13 @@ where
             score += max;
         }
 
-        tx.send(Message::new(self.i, evals, start_time.elapsed()))
+        tx.send(Message::new(self.i, evals, 0, 0, 0, start_time.elapsed()))
             .unwrap();
         self.i += 1;
 
         if score > self.best_score {
-            println!("old score: {}, new score: {}", self.best_score, score);
-            println!("old: {}, new {}", self.best_solution, new_best);
+            // println!("old score: {}, new score: {}", self.best_score, score);
+            // println!("old: {}, new {}", self.best_solution, new_best);
             self.best_solution = new_best;
             self.best_score = score;
             self.best_length = tail_length + head_length;
@@ -231,7 +238,7 @@ where
     }
 }
 
-impl<'a, IndexType, Nw, Ew> Iterator for TwoSwap<'a, IndexType, Nw, Ew>
+impl<'a, IndexType, Nw, Ew, W> Iterator for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy,
@@ -244,11 +251,11 @@ where
         + PartialOrd
         + Sum
         + Div<Output = Ew>,
+    W: Write,
 {
     type Item = Solution<IndexType>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        println!("called next");
         self.single_iteration().cloned()
     }
 }
@@ -258,6 +265,10 @@ mod tests {
     use super::*;
     use crate::graph::MatrixGraph;
     use crate::metaheuristic::Metaheuristic;
+
+    fn nw(n: f64, _: f64, _: usize, _: f64) -> f64 {
+        n
+    }
 
     fn weighted_graph() -> MatrixGraph<usize, f64, f64> {
         MatrixGraph::new_usize_indexed(
@@ -286,7 +297,7 @@ mod tests {
         let graph = weighted_graph();
         let optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, 100.0),
-            Params::new(|nw, _, _, _| nw),
+            Params::new(&nw),
             Supervisor::default(),
         );
         let solution = optimizer.current_solution();
@@ -300,10 +311,26 @@ mod tests {
         let graph = weighted_graph();
         let mut optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, 100.0),
-            Params::new(|nw, _, _, _| nw),
+            Params::new(&nw),
             Supervisor::default(),
         );
         let _ = optimizer.single_iteration();
+        let solution = optimizer.current_solution();
+        let correct = Solution::<usize>::from_edges(vec![(0, 1), (1, 3), (3, 0)]).unwrap();
+
+        assert_eq!(solution.0, &correct);
+        assert_eq!(solution.1, 7.8);
+    }
+
+    #[test]
+    fn solve_works() {
+        let graph = weighted_graph();
+        let mut optimizer = TwoSwap::new(
+            ProblemInstance::new(&graph, 0, 100.0),
+            Params::new(&nw),
+            Supervisor::default(),
+        );
+        optimizer.solve();
         let solution = optimizer.current_solution();
         let correct = Solution::<usize>::from_edges(vec![(0, 1), (1, 3), (3, 0)]).unwrap();
 

@@ -21,12 +21,12 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::time::Instant;
 
-pub struct ACO<'a, IndexType: Clone, Nw, Ew> {
+pub struct Aco<'a, IndexType: Clone, Nw, Ew> {
     graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
     pheromone_matrix: MatrixGraph<IndexType, (), f64>,
     goal_point: IndexType,
     max_time: Ew,
-    heuristic: Heuristic<IndexType, Nw, Ew>,
+    heuristic: &'a Heuristic<IndexType, Nw, Ew>,
     seed: u128,
     alpha: f64,
     beta: f64,
@@ -40,7 +40,7 @@ pub struct ACO<'a, IndexType: Clone, Nw, Ew> {
     rng: Rand64,
 }
 
-impl<'a, IndexType, Nw> ACO<'a, IndexType, Nw, f64>
+impl<'a, IndexType, Nw> Aco<'a, IndexType, Nw, f64>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy + Zero + PartialOrd,
@@ -65,15 +65,15 @@ where
 }
 
 impl<'a, IndexType, Nw>
-    Metaheuristic<'a, Params<IndexType, Nw, f64>, IndexType, Nw, f64, Supervisor>
-    for ACO<'a, IndexType, Nw, f64>
+    Metaheuristic<'a, Params<'a, IndexType, Nw, f64>, IndexType, Nw, f64, Supervisor>
+    for Aco<'a, IndexType, Nw, f64>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy + Zero + PartialOrd,
 {
     fn new(
         problem: ProblemInstance<'a, IndexType, Nw, f64>,
-        params: Params<IndexType, Nw, f64>,
+        params: Params<'a, IndexType, Nw, f64>,
         supervisor: Supervisor,
     ) -> Self {
         let graph = problem.graph;
@@ -89,7 +89,7 @@ where
         )
         .unwrap();
 
-        ACO {
+        Aco {
             graph,
             pheromone_matrix: pheromones,
             goal_point: problem.goal_point,
@@ -110,7 +110,6 @@ where
     }
 
     fn single_iteration(&mut self) -> Option<&Solution<IndexType>> {
-        let start_time = Instant::now();
         let ants = vec![
             {
                 let (sender, id) = self.supervisor.new_ant();
@@ -119,7 +118,7 @@ where
                     &self.pheromone_matrix,
                     self.goal_point,
                     self.max_time,
-                    &self.heuristic,
+                    self.heuristic,
                     self.rng.rand_u64() as u128 + ((self.rng.rand_u64() as u128) << 64),
                     self.alpha,
                     self.beta,
@@ -135,6 +134,7 @@ where
             solutions.push(ant.get_solution())
         }
 
+        let start_time = Instant::now();
         let mut best_length = f64::zero();
         let mut best_score = Nw::zero();
         let mut best_solution = Solution::new();
@@ -149,6 +149,8 @@ where
         }
 
         let duration = start_time.elapsed();
+        let _ = self.supervisor.sender.send(Message::new(0, 0, duration)); // Ant 0 is always supervisor
+        self.supervisor.aggregate_receive();
         self.supervisor.reset();
         if best_score > self.best_score {
             self.pheromone_update(&best_solution, best_length);

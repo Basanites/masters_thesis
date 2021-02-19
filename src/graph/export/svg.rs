@@ -7,13 +7,13 @@ use std::io::prelude::*;
 use tera::Context;
 use tera::Tera;
 
-pub struct SVG {
+pub struct Svg {
     pub width: usize,
     pub height: usize,
     pub padding: usize,
 }
 
-impl SVG {
+impl Svg {
     fn scaled_point(&self, point: &Point, scaler: &PointScaler) -> Point {
         let scaled_point = scaler.scale_point(point);
 

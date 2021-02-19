@@ -3,19 +3,15 @@ mod solution;
 pub mod supervisor;
 pub mod two_swap;
 
-use crate::graph::GenericWeightedGraph;
-pub use aco::ACO;
+pub use aco::Aco;
 pub use solution::{
     solution_length, solution_score, solution_score_and_length, Solution, SolutionError,
 };
 pub use two_swap::TwoSwap;
 
-pub type Heuristic<IndexType, Nw, Ew> = fn(
-    to_node_weight: Nw,
-    edge_to_node_weight: Ew,
-    to_node_id: IndexType,
-    elapsed_time_ratio_until: Ew,
-) -> f64;
+use crate::graph::GenericWeightedGraph;
+
+pub type Heuristic<IndexType, Nw, Ew> = dyn Fn(Nw, Ew, IndexType, Ew) -> f64;
 
 pub trait Metaheuristic<'a, Params, IndexType, Nw, Ew, SupervisorType> {
     fn new(

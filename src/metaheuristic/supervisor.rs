@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::ops::{Add, AddAssign};
 use std::time::Duration;
 
@@ -7,10 +8,10 @@ pub trait Message {
     fn get_info(&self) -> MessageInfo;
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct MessageInfo {
-    evaluations: usize,
-    cpu_time: Duration,
+    pub evaluations: usize,
+    pub cpu_time: Duration,
 }
 
 impl MessageInfo {

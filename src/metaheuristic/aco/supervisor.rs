@@ -7,7 +7,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
 pub struct Supervisor {
-    sender: Sender<aco::Message>,
+    pub sender: Sender<aco::Message>,
     receiver: Receiver<aco::Message>,
     ants: usize,
     messages: HashMap<usize, Vec<MessageInfo>>,
@@ -29,8 +29,8 @@ impl Supervisor {
     }
 
     pub fn new_ant(&mut self) -> (Sender<aco::Message>, usize) {
-        let id = self.ants;
         self.ants += 1;
+        let id = self.ants;
 
         (self.sender.clone(), id)
     }
@@ -60,6 +60,9 @@ impl Supervisor {
         self.ants = 0;
         self.messages = HashMap::default();
         self.counters = HashMap::default();
+        let (tx, rx) = mpsc::channel();
+        self.sender = tx;
+        self.receiver = rx;
     }
 }
 

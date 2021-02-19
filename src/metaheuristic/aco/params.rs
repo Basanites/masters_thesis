@@ -1,8 +1,8 @@
 use crate::metaheuristic::Heuristic;
 use crate::rng::os_random_seed;
 
-pub struct Params<IndexType, Nw, Ew> {
-    pub heuristic: Heuristic<IndexType, Nw, Ew>,
+pub struct Params<'a, IndexType, Nw, Ew> {
+    pub heuristic: &'a Heuristic<IndexType, Nw, Ew>,
     pub alpha: f64,
     pub beta: f64,
     pub rho: f64,
@@ -10,9 +10,9 @@ pub struct Params<IndexType, Nw, Ew> {
     pub ant_count: usize,
 }
 
-impl<IndexType, Nw, Ew> Params<IndexType, Nw, Ew> {
+impl<'a, IndexType, Nw, Ew> Params<'a, IndexType, Nw, Ew> {
     pub fn new(
-        heuristic: Heuristic<IndexType, Nw, Ew>,
+        heuristic: &'a Heuristic<IndexType, Nw, Ew>,
         alpha: f64,
         beta: f64,
         rho: f64,

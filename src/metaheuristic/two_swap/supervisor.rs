@@ -2,24 +2,29 @@ use crate::metaheuristic::supervisor;
 use crate::metaheuristic::supervisor::{Message, MessageInfo};
 use crate::metaheuristic::two_swap;
 
+use csv::Writer;
+use serde::Serialize;
+use std::io::{stderr, Stderr, Write};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
-pub struct Supervisor {
+pub struct Supervisor<W: Write> {
     sender: Sender<two_swap::Message>,
     receiver: Receiver<two_swap::Message>,
     messages: Vec<MessageInfo>,
+    writer: Writer<W>,
     aggregation_rate: usize,
 }
 
-impl Supervisor {
-    pub fn new(aggregation_rate: usize) -> Self {
+impl<W: Write> Supervisor<W> {
+    pub fn new(aggregation_rate: usize, writer: Writer<W>) -> Self {
         let (tx, rx) = mpsc::channel();
         Supervisor {
             sender: tx,
             receiver: rx,
             messages: Vec::default(),
+            writer,
             aggregation_rate,
         }
     }
@@ -37,19 +42,34 @@ impl Supervisor {
             self.messages[idx] += message.get_info();
         }
 
-        eprintln!("\n{:?}\n", self.messages);
+        for i in 0..self.messages.len() {
+            let msg_info = self.messages.get(i).unwrap();
+            let record = two_swap::Message::new(
+                i * self.aggregation_rate,
+                msg_info.evaluations,
+                0,
+                0,
+                0,
+                msg_info.cpu_time,
+            );
+            let res = self.writer.serialize(record);
+            if let Err(err) = res {
+                eprintln!("{:?}", err);
+            }
+        }
     }
 }
 
-impl supervisor::Supervisor<two_swap::Message> for Supervisor {}
+impl<W: Write> supervisor::Supervisor<two_swap::Message> for Supervisor<W> {}
 
-impl Default for Supervisor {
+impl Default for Supervisor<Stderr> {
     fn default() -> Self {
         let (tx, rx) = mpsc::channel();
         Supervisor {
             sender: tx,
             receiver: rx,
             messages: Vec::default(),
+            writer: Writer::from_writer(stderr()),
             aggregation_rate: 1,
         }
     }

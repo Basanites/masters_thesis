@@ -1,11 +1,11 @@
 use crate::metaheuristic::Heuristic;
 
-pub struct Params<IndexType, Nw, Ew> {
-    pub heuristic: Heuristic<IndexType, Nw, Ew>,
+pub struct Params<'a, IndexType, Nw, Ew> {
+    pub heuristic: &'a Heuristic<IndexType, Nw, Ew>,
 }
 
-impl<IndexType, Nw, Ew> Params<IndexType, Nw, Ew> {
-    pub fn new(heuristic: Heuristic<IndexType, Nw, Ew>) -> Self {
+impl<'a, IndexType, Nw, Ew> Params<'a, IndexType, Nw, Ew> {
+    pub fn new(heuristic: &'a Heuristic<IndexType, Nw, Ew>) -> Self {
         Params { heuristic }
     }
 }

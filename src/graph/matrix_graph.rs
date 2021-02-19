@@ -153,6 +153,7 @@ where
         }
     }
 
+    #[allow(dead_code)]
     fn cast_usize_to_generic_graph(
         ugraph: MatrixGraph<usize, Nw, Ew>,
         nmap: HashMap<IndexType, usize>,
@@ -961,8 +962,8 @@ mod usize_indexed_tests {
             "Node 1 should only have 2 as neighbor."
         );
         assert_eq!(
-            graph.neighbor_ids(2).unwrap().sort(),
-            vec![1, 0].sort(),
+            graph.neighbor_ids(2).unwrap().sort_unstable(),
+            vec![1, 0].sort_unstable(),
             "Node 2 should have 1 and 0 as neighbor."
         );
         assert_eq!(
@@ -1010,8 +1011,8 @@ mod usize_indexed_tests {
             "Size should not change during node insertion."
         );
         assert_eq!(
-            graph.node_ids().sort(),
-            vec![0, 1, 2, 4].sort(),
+            graph.node_ids().sort_unstable(),
+            vec![0, 1, 2, 4].sort_unstable(),
             "Node list was not updated correctly after insertion."
         );
         assert_eq!(
@@ -1064,13 +1065,13 @@ mod usize_indexed_tests {
             "Size was updated incorrectly after removal."
         );
         assert_eq!(
-            graph.node_ids().sort(),
-            vec![0, 2].sort(),
+            graph.node_ids().sort_unstable(),
+            vec![0, 2].sort_unstable(),
             "Nodelist was updated incorrectly after removal."
         );
         assert_eq!(
-            graph.edge_ids().sort(),
-            vec![(2, 0)].sort(),
+            graph.edge_ids().sort_unstable(),
+            vec![(2, 0)].sort_unstable(),
             "Edgelist was updated incorrectly after removal."
         );
     }
@@ -1226,8 +1227,8 @@ mod usize_indexed_tests {
         let graph = valid_weighted();
 
         b.iter(|| {
-            for _ in valid_weighted().iter_edge_ids() {
-                let n = test::black_box(1);
+            for _ in graph.iter_edge_ids() {
+                let _n = test::black_box(1);
             }
         })
     }
@@ -1237,8 +1238,8 @@ mod usize_indexed_tests {
         let graph = valid_weighted();
 
         b.iter(|| {
-            for _ in valid_weighted().iter_edges() {
-                let n = test::black_box(1);
+            for _ in graph.iter_edges() {
+                let _n = test::black_box(1);
             }
         })
     }
@@ -1248,8 +1249,8 @@ mod usize_indexed_tests {
         let graph = valid_weighted();
 
         b.iter(|| {
-            for _ in valid_weighted().edge_ids() {
-                let n = test::black_box(1);
+            for _ in graph.edge_ids() {
+                let _n = test::black_box(1);
             }
         })
     }
@@ -1259,10 +1260,10 @@ mod usize_indexed_tests {
         let graph = valid_weighted();
 
         b.iter(|| {
-            let edges = valid_weighted().edge_ids();
+            let edges = graph.edge_ids();
             for edge in edges {
-                valid_weighted().edge_weight(edge).unwrap();
-                let n = test::black_box(1);
+                graph.edge_weight(edge).unwrap();
+                let _n = test::black_box(1);
             }
         })
     }

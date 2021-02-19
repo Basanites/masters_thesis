@@ -2,7 +2,7 @@ mod dot;
 pub mod svg;
 
 pub use dot::Dot;
-pub use svg::SVG;
+pub use svg::Svg;
 
 use crate::graph::WeightedGraph;
 use std::fmt::Display;
