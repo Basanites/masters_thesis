@@ -289,8 +289,10 @@ pub fn import_pbf(path: &str, nw_gen: &dyn Fn() -> f64) -> MatrixGraph<GeoPoint,
     let mut node_map: HashMap<OsmId, GeoPoint> = HashMap::new();
     for (id, obj) in nodes.iter() {
         if !node_map.contains_key(id) {
-            let point =
-                GeoPoint::from_degrees(obj.node().unwrap().lat(), obj.node().unwrap().lon());
+            let point = GeoPoint::from_micro_degrees(
+                obj.node().unwrap().decimicro_lat,
+                obj.node().unwrap().decimicro_lon,
+            );
             node_map.insert(*id, point);
         }
     }

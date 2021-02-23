@@ -5,12 +5,12 @@ use std::hash::{Hash, Hasher};
 
 #[derive(Copy, Clone, Debug, Serialize)]
 pub struct GeoPoint {
-    micro_lat: i64,
-    micro_lon: i64,
+    micro_lat: i32,
+    micro_lon: i32,
 }
 
 impl GeoPoint {
-    pub fn from_micro_degrees(micro_lat: i64, micro_lon: i64) -> Self {
+    pub fn from_micro_degrees(micro_lat: i32, micro_lon: i32) -> Self {
         GeoPoint {
             micro_lat,
             micro_lon,
@@ -47,11 +47,11 @@ impl GeoPoint {
         degrees_to_radians(from_micro_scale(self.micro_lon()))
     }
 
-    pub fn micro_lat(&self) -> i64 {
+    pub fn micro_lat(&self) -> i32 {
         self.micro_lat
     }
 
-    pub fn micro_lon(&self) -> i64 {
+    pub fn micro_lon(&self) -> i32 {
         self.micro_lon
     }
 }
@@ -93,11 +93,11 @@ fn radians_to_degrees(radians: f64) -> f64 {
     radians * 180.0 / PI
 }
 
-fn to_micro_scale(val: f64) -> i64 {
-    (val * 1000000.0) as i64
+fn to_micro_scale(val: f64) -> i32 {
+    (val * 1000000.0) as i32
 }
 
-fn from_micro_scale(val: i64) -> f64 {
+fn from_micro_scale(val: i32) -> f64 {
     (val as f64) / 1000000.0
 }
 
