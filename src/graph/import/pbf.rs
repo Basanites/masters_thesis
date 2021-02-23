@@ -7,7 +7,6 @@ use std::fs::File;
 
 use crate::geo::{geodistance_haversine, GeoPoint};
 use crate::graph::{GenericWeightedGraph, MatrixGraph};
-use crate::util::Point;
 
 /// Calculates the distance between two nodes in km.
 fn get_node_distance(node_1: &Node, node_2: &Node) -> f64 {
@@ -205,7 +204,7 @@ fn contract_nodes(
 
 /// Creates a minimized MatrixGraph from a given pbf file.
 /// The nodes are contracted as to not run out of memory for the MatrixGraph.
-pub fn import_pbf(path: &str) -> MatrixGraph<usize, (Point, usize), f64> {
+pub fn import_pbf(path: &str, nw_gen: &dyn Fn() -> f64) -> MatrixGraph<GeoPoint, f64, f64> {
     let mut pbf = OsmPbfReader::new(File::open(path).unwrap());
     let mut neighbors = HashMap::<OsmId, HashMap<OsmId, HashMap<String, f64>>>::new();
     let mut inv_neighbors = HashMap::<OsmId, Vec<OsmId>>::new();
@@ -287,26 +286,21 @@ pub fn import_pbf(path: &str) -> MatrixGraph<usize, (Point, usize), f64> {
     contract_nodes(&mut nodes, &mut neighbors, inv_neighbors);
 
     // Map node ids from osm to consecutive ids starting at 0
-    let mut node_map: HashMap<OsmId, usize> = HashMap::new();
-    let mut counter = 0;
-    for id in nodes.keys() {
+    let mut node_map: HashMap<OsmId, GeoPoint> = HashMap::new();
+    for (id, obj) in nodes.iter() {
         if !node_map.contains_key(id) {
-            node_map.insert(*id, counter);
-            counter += 1;
+            let point =
+                GeoPoint::from_degrees(obj.node().unwrap().lat(), obj.node().unwrap().lon());
+            node_map.insert(*id, point);
         }
     }
 
-    let mut mapped_graph = MatrixGraph::<usize, (Point, usize), f64>::with_size(counter);
+    let mut mapped_graph = MatrixGraph::<GeoPoint, f64, f64>::with_size(node_map.len());
 
     // Insert nodes into the graph with fixed weight 1
-    for (id, &i) in &node_map {
-        let obj = &nodes[id];
-        let pos = Point {
-            x: obj.node().unwrap().lat(),
-            y: obj.node().unwrap().lon(),
-        };
+    for (_, point) in &node_map {
         // TODO: when logger is here, log this to errorlog
-        let _ = mapped_graph.add_node(i, (pos, 1));
+        let _ = mapped_graph.add_node(*point, nw_gen());
     }
 
     // Insert edges with their weight being the traveltime between each other.
