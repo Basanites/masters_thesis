@@ -16,18 +16,21 @@ use crate::rng::rng64;
 
 use num_traits::identities::Zero;
 use oorandom::Rand64;
+use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::io::Write;
 use std::time::Instant;
 
-pub struct Aco<'a, IndexType: Clone, Nw, Ew> {
-    graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
+pub struct Aco<'a, IndexType: Clone, Nw, Ew, W: Write> {
+    graph: &'a RefCell<
+        dyn GenericWeightedGraph<IndexType = IndexType, NodeWeightType = Nw, EdgeWeightType = Ew>,
+    >,
     pheromone_matrix: MatrixGraph<IndexType, (), f64>,
     goal_point: IndexType,
     max_time: Ew,
     heuristic: &'a Heuristic<IndexType, Nw, Ew>,
-    seed: u128,
     alpha: f64,
     beta: f64,
     rho: f64,
@@ -36,14 +39,15 @@ pub struct Aco<'a, IndexType: Clone, Nw, Ew> {
     best_solution: Solution<IndexType>,
     best_score: Nw,
     best_length: Ew,
-    supervisor: Supervisor,
+    supervisor: Supervisor<W>,
     rng: Rand64,
 }
 
-impl<'a, IndexType, Nw> Aco<'a, IndexType, Nw, f64>
+impl<'a, IndexType, Nw, W> Aco<'a, IndexType, Nw, f64, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy + Zero + PartialOrd,
+    W: Write,
 {
     fn pheromone_update(&mut self, solution: &Solution<IndexType>, solution_length: f64) {
         let to_add = self.q / solution_length;
@@ -64,19 +68,21 @@ where
     }
 }
 
-impl<'a, IndexType, Nw>
-    Metaheuristic<'a, Params<'a, IndexType, Nw, f64>, IndexType, Nw, f64, Supervisor>
-    for Aco<'a, IndexType, Nw, f64>
+impl<'a, IndexType, Nw, W> Metaheuristic<'a, IndexType, Nw, f64> for Aco<'a, IndexType, Nw, f64, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
     Nw: Copy + Zero + PartialOrd,
+    W: Write,
 {
+    type Params = Params<'a, IndexType, Nw, f64>;
+    type SupervisorType = Supervisor<W>;
+
     fn new(
         problem: ProblemInstance<'a, IndexType, Nw, f64>,
-        params: Params<'a, IndexType, Nw, f64>,
-        supervisor: Supervisor,
+        params: Self::Params,
+        supervisor: Self::SupervisorType,
     ) -> Self {
-        let graph = problem.graph;
+        let graph = problem.graph.borrow();
         let pheromones = MatrixGraph::new(
             graph.iter_node_ids().map(|id| (id, ())).collect(),
             graph
@@ -90,7 +96,7 @@ where
         .unwrap();
 
         Aco {
-            graph,
+            graph: problem.graph,
             pheromone_matrix: pheromones,
             goal_point: problem.goal_point,
             max_time: problem.max_time,
@@ -99,7 +105,6 @@ where
             beta: params.beta,
             rho: params.rho,
             q: 1.0,
-            seed: params.seed,
             ant_count: params.ant_count,
             best_solution: Solution::new(),
             best_score: Nw::zero(),

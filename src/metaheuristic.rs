@@ -9,30 +9,49 @@ pub use solution::{
 };
 pub use two_swap::TwoSwap;
 
+use std::cell::RefCell;
+
 use crate::graph::GenericWeightedGraph;
 
 pub type Heuristic<IndexType, Nw, Ew> = dyn Fn(Nw, Ew, IndexType, Ew) -> f64;
 
-pub trait Metaheuristic<'a, Params, IndexType, Nw, Ew, SupervisorType> {
+pub trait Metaheuristic<'a, IndexType, NodeWeightType, EdgeWeightType> {
+    type Params;
+    type SupervisorType;
+
     fn new(
-        problem: ProblemInstance<'a, IndexType, Nw, Ew>,
-        params: Params,
-        supervisor: SupervisorType,
+        problem: ProblemInstance<'a, IndexType, NodeWeightType, EdgeWeightType>,
+        params: Self::Params,
+        supervisor: Self::SupervisorType,
     ) -> Self;
     fn single_iteration(&mut self) -> Option<&Solution<IndexType>>;
 }
 
-pub struct ProblemInstance<'a, IndexType, Nw, Ew> {
-    graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
+pub struct ProblemInstance<'a, IndexType, NodeWeightType, EdgeWeightType> {
+    graph: &'a RefCell<
+        dyn GenericWeightedGraph<
+            IndexType = IndexType,
+            NodeWeightType = NodeWeightType,
+            EdgeWeightType = EdgeWeightType,
+        >,
+    >,
     goal_point: IndexType,
-    max_time: Ew,
+    max_time: EdgeWeightType,
 }
 
-impl<'a, IndexType, Nw, Ew> ProblemInstance<'a, IndexType, Nw, Ew> {
+impl<'a, IndexType, NodeWeightType, EdgeWeightType>
+    ProblemInstance<'a, IndexType, NodeWeightType, EdgeWeightType>
+{
     pub fn new(
-        graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
+        graph: &'a RefCell<
+            dyn GenericWeightedGraph<
+                IndexType = IndexType,
+                NodeWeightType = NodeWeightType,
+                EdgeWeightType = EdgeWeightType,
+            >,
+        >,
         goal_point: IndexType,
-        max_time: Ew,
+        max_time: EdgeWeightType,
     ) -> Self {
         ProblemInstance {
             graph,

@@ -10,6 +10,7 @@ use crate::graph::GenericWeightedGraph;
 use crate::metaheuristic::{solution_length, Heuristic, Metaheuristic, ProblemInstance, Solution};
 
 use num_traits::identities::Zero;
+use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
@@ -19,34 +20,47 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Sub, SubAssign};
 use std::time::Instant;
 
-pub struct TwoSwap<'a, IndexType, Nw, Ew, W: Write> {
-    graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
+pub struct TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType, W: Write> {
+    graph: &'a RefCell<
+        dyn GenericWeightedGraph<
+            IndexType = IndexType,
+            NodeWeightType = NodeWeightType,
+            EdgeWeightType = EdgeWeightType,
+        >,
+    >,
     goal_point: IndexType,
-    heuristic: &'a Heuristic<IndexType, Nw, Ew>,
-    max_time: Ew,
+    heuristic: &'a Heuristic<IndexType, NodeWeightType, EdgeWeightType>,
+    max_time: EdgeWeightType,
     best_solution: Solution<IndexType>,
     best_score: f64,
-    best_length: Ew,
+    best_length: EdgeWeightType,
     pub supervisor: Supervisor<W>,
     i: usize,
 }
 
-impl<'a, IndexType, Nw, Ew, W> TwoSwap<'a, IndexType, Nw, Ew, W>
+impl<'a, IndexType, NodeWeightType, EdgeWeightType, W>
+    TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy,
-    Ew: Copy
+    NodeWeightType: Copy,
+    EdgeWeightType: Copy
         + Zero
-        + Add<Output = Ew>
-        + Sub<Output = Ew>
+        + Add<Output = EdgeWeightType>
+        + Sub<Output = EdgeWeightType>
         + AddAssign
         + SubAssign
         + PartialOrd
         + Sum
-        + Div<Output = Ew>,
+        + Div<Output = EdgeWeightType>,
     W: Write,
 {
-    fn score(&self, node_weight: Nw, edge_weight: Ew, point: IndexType, distance_up_to: Ew) -> f64 {
+    fn score(
+        &self,
+        node_weight: NodeWeightType,
+        edge_weight: EdgeWeightType,
+        point: IndexType,
+        distance_up_to: EdgeWeightType,
+    ) -> f64 {
         (self.heuristic)(
             node_weight,
             edge_weight,
@@ -55,18 +69,23 @@ where
         )
     }
 
-    fn score_edge(&self, from: IndexType, to: IndexType, distance_up_to: Ew) -> f64 {
+    fn score_edge(&self, from: IndexType, to: IndexType, distance_up_to: EdgeWeightType) -> f64 {
         self.score(
-            *self.graph.node_weight(to).unwrap(),
-            *self.graph.edge_weight((from, to)).unwrap(),
+            *self.graph.borrow().node_weight(to).unwrap(),
+            *self.graph.borrow().edge_weight((from, to)).unwrap(),
             to,
             distance_up_to,
         )
     }
 
-    fn score_with_known_edge(&self, to: IndexType, edge_weight: Ew, distance_up_to: Ew) -> f64 {
+    fn score_with_known_edge(
+        &self,
+        to: IndexType,
+        edge_weight: EdgeWeightType,
+        distance_up_to: EdgeWeightType,
+    ) -> f64 {
         self.score(
-            *self.graph.node_weight(to).unwrap(),
+            *self.graph.borrow().node_weight(to).unwrap(),
             edge_weight,
             to,
             distance_up_to,
@@ -80,14 +99,15 @@ where
         // we take the node with best score we can also get back from
         let max = self
             .graph
+            .borrow()
             .iter_neighbors(self.goal_point)
             .unwrap()
-            .filter(|(id, _)| self.graph.has_edge((*id, self.goal_point)))
+            .filter(|(id, _)| self.graph.borrow().has_edge((*id, self.goal_point)))
             .map(|(id, weight)| -> (IndexType, f64) {
                 (
                     id,
-                    self.score_with_known_edge(id, *weight, Ew::zero())
-                        + self.score_edge(id, self.goal_point, Ew::zero()),
+                    self.score_with_known_edge(id, *weight, EdgeWeightType::zero())
+                        + self.score_edge(id, self.goal_point, EdgeWeightType::zero()),
                 )
             })
             .inspect(|_| evals += 1)
@@ -107,7 +127,7 @@ where
         self.i += 1;
     }
 
-    pub fn current_solution(&self) -> (&Solution<IndexType>, f64, Ew) {
+    pub fn current_solution(&self) -> (&Solution<IndexType>, f64, EdgeWeightType) {
         (&self.best_solution, self.best_score, self.best_length)
     }
 
@@ -117,8 +137,7 @@ where
     }
 }
 
-impl<'a, IndexType, Nw, Ew, W>
-    Metaheuristic<'a, Params<'a, IndexType, Nw, Ew>, IndexType, Nw, Ew, Supervisor<W>>
+impl<'a, IndexType, Nw, Ew, W> Metaheuristic<'a, IndexType, Nw, Ew>
     for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
@@ -134,10 +153,13 @@ where
         + Div<Output = Ew>,
     W: Write,
 {
+    type Params = Params<'a, IndexType, Nw, Ew>;
+    type SupervisorType = Supervisor<W>;
+
     fn new(
         problem: ProblemInstance<'a, IndexType, Nw, Ew>,
-        params: Params<'a, IndexType, Nw, Ew>,
-        supervisor: Supervisor<W>,
+        params: Self::Params,
+        supervisor: Self::SupervisorType,
     ) -> Self {
         let mut swap = TwoSwap {
             graph: problem.graph,
@@ -168,9 +190,10 @@ where
         let mut temp_score: f64;
         let mut temp_new_distance = tail_length;
         for (from, to) in self.best_solution.iter_edges() {
-            let original_distance = *self.graph.edge_weight((*from, *to)).unwrap();
+            let original_distance = *self.graph.borrow().edge_weight((*from, *to)).unwrap();
             temp_visited.insert(*from, true);
-            let t_weight = self.graph.node_weight(*to).unwrap();
+            let g_borrowed = self.graph.borrow();
+            let t_weight = g_borrowed.node_weight(*to).unwrap();
             // if we already visited the node we can ignore it
             max = if temp_visited.contains_key(to) {
                 0.0
@@ -180,7 +203,7 @@ where
             };
             let mut best_follow = *to;
 
-            for (nid, weight) in self.graph.iter_neighbors(*from).unwrap() {
+            for (nid, weight) in self.graph.borrow().iter_neighbors(*from).unwrap() {
                 // nodes that have been visited before don't have a value to us
                 temp_score = if temp_visited.contains_key(&nid) {
                     0.0
@@ -188,7 +211,7 @@ where
                     evals += 1;
                     self.score_with_known_edge(nid, *weight, tail_length)
                 };
-                if let Ok(return_weight) = self.graph.edge_weight((nid, *to)) {
+                if let Ok(return_weight) = self.graph.borrow().edge_weight((nid, *to)) {
                     // only score this edge if the to node has not yet been visited
                     temp_score += if temp_visited.contains_key(to) {
                         0.0
@@ -294,7 +317,7 @@ mod tests {
 
     #[test]
     fn initialization_works() {
-        let graph = weighted_graph();
+        let graph = RefCell::new(weighted_graph());
         let optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, 100.0),
             Params::new(&nw),
@@ -308,7 +331,7 @@ mod tests {
 
     #[test]
     fn single_iteration_works() {
-        let graph = weighted_graph();
+        let graph = RefCell::new(weighted_graph());
         let mut optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, 100.0),
             Params::new(&nw),
@@ -324,7 +347,7 @@ mod tests {
 
     #[test]
     fn solve_works() {
-        let graph = weighted_graph();
+        let graph = RefCell::new(weighted_graph());
         let mut optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, 100.0),
             Params::new(&nw),

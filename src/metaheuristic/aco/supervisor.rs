@@ -2,21 +2,24 @@ use crate::metaheuristic::aco;
 use crate::metaheuristic::supervisor;
 use crate::metaheuristic::supervisor::{Message, MessageInfo};
 
+use csv::Writer;
 use std::collections::HashMap;
+use std::io::{stderr, Stderr, Write};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
-pub struct Supervisor {
+pub struct Supervisor<W: Write> {
     pub sender: Sender<aco::Message>,
     receiver: Receiver<aco::Message>,
     ants: usize,
     messages: HashMap<usize, Vec<MessageInfo>>,
     counters: HashMap<usize, usize>,
     aggregation_rate: usize,
+    writer: Writer<W>,
 }
 
-impl Supervisor {
-    pub fn new(aggregation_rate: usize) -> Self {
+impl<W: Write> Supervisor<W> {
+    pub fn new(aggregation_rate: usize, writer: Writer<W>) -> Self {
         let (tx, rx) = mpsc::channel();
         Supervisor {
             sender: tx,
@@ -25,6 +28,7 @@ impl Supervisor {
             messages: HashMap::default(),
             counters: HashMap::default(),
             aggregation_rate,
+            writer,
         }
     }
 
@@ -66,9 +70,9 @@ impl Supervisor {
     }
 }
 
-impl supervisor::Supervisor<aco::Message> for Supervisor {}
+impl<W: Write> supervisor::Supervisor<aco::Message> for Supervisor<W> {}
 
-impl Default for Supervisor {
+impl Default for Supervisor<Stderr> {
     fn default() -> Self {
         let (tx, rx) = mpsc::channel();
         Supervisor {
@@ -78,6 +82,7 @@ impl Default for Supervisor {
             messages: HashMap::default(),
             counters: HashMap::default(),
             aggregation_rate: 1,
+            writer: Writer::from_writer(stderr()),
         }
     }
 }

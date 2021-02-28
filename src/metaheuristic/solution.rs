@@ -1,64 +1,75 @@
 use crate::graph::{Edge, GenericWeightedGraph, GraphError};
 
 use num_traits::identities::Zero;
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 
-pub fn solution_length<IndexType, Nw, Ew>(
+pub fn solution_length<IndexType, NodeWeightType, EdgeWeightType>(
     solution: &Solution<IndexType>,
-    graph: &dyn GenericWeightedGraph<IndexType, Nw, Ew>,
-) -> Result<Ew, GraphError<IndexType>>
+    graph: &RefCell<
+        dyn GenericWeightedGraph<
+            IndexType = IndexType,
+            NodeWeightType = NodeWeightType,
+            EdgeWeightType = EdgeWeightType,
+        >,
+    >,
+) -> Result<EdgeWeightType, GraphError<IndexType>>
 where
-    IndexType: PartialEq + Copy + Debug,
-    Ew: Sum + Copy,
+    IndexType: PartialEq + Copy + Debug + Display,
+    EdgeWeightType: Sum + Copy,
 {
     for (from, to) in solution.iter_edges() {
-        if let Err(error) = graph.edge_weight((*from, *to)) {
+        if let Err(error) = graph.borrow().edge_weight((*from, *to)) {
             return Err(error);
         }
     }
 
     Ok(solution
         .iter_edges()
-        .map(|(from, to)| *graph.edge_weight((*from, *to)).unwrap())
+        .map(|(from, to)| *graph.borrow().edge_weight((*from, *to)).unwrap())
         .sum())
 }
 
 pub fn solution_score<IndexType, Nw, Ew>(
     solution: &Solution<IndexType>,
-    graph: &dyn GenericWeightedGraph<IndexType, Nw, Ew>,
+    graph: &RefCell<
+        dyn GenericWeightedGraph<IndexType = IndexType, NodeWeightType = Nw, EdgeWeightType = Ew>,
+    >,
 ) -> Result<Nw, GraphError<IndexType>>
 where
-    IndexType: PartialEq + Copy + Debug,
+    IndexType: PartialEq + Copy + Debug + Display,
     Nw: Sum + Copy,
 {
     for id in solution.iter_nodes() {
-        if let Err(error) = graph.node_weight(*id) {
+        if let Err(error) = graph.borrow().node_weight(*id) {
             return Err(error);
         }
     }
 
     Ok(solution
         .iter_nodes()
-        .map(|id| *graph.node_weight(*id).unwrap())
+        .map(|id| *graph.borrow().node_weight(*id).unwrap())
         .sum())
 }
 
 pub fn solution_score_and_length<IndexType, Nw, Ew>(
     solution: &Solution<IndexType>,
-    graph: &dyn GenericWeightedGraph<IndexType, Nw, Ew>,
+    graph: &RefCell<
+        dyn GenericWeightedGraph<IndexType = IndexType, NodeWeightType = Nw, EdgeWeightType = Ew>,
+    >,
 ) -> Result<(Nw, Ew), GraphError<IndexType>>
 where
-    IndexType: PartialEq + Copy + Debug,
+    IndexType: PartialEq + Copy + Debug + Display,
     Nw: Copy + Zero,
     Ew: Copy + Zero,
 {
     for (from, to) in solution.iter_edges() {
-        if let Err(error) = graph.edge_weight((*from, *to)) {
+        if let Err(error) = graph.borrow().edge_weight((*from, *to)) {
             return Err(error);
         }
-        if let Err(error) = graph.node_weight(*to) {
+        if let Err(error) = graph.borrow().node_weight(*to) {
             return Err(error);
         }
     }
@@ -67,8 +78,8 @@ where
         .iter_edges()
         .map(|(from, to)| {
             (
-                *graph.node_weight(*to).unwrap(),
-                *graph.edge_weight((*from, *to)).unwrap(),
+                *graph.borrow().node_weight(*to).unwrap(),
+                *graph.borrow().edge_weight((*from, *to)).unwrap(),
             )
         })
         .fold((Nw::zero(), Ew::zero()), |acc, (nw, ew)| {

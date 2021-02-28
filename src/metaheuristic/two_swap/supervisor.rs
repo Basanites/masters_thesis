@@ -3,7 +3,6 @@ use crate::metaheuristic::supervisor::{Message, MessageInfo};
 use crate::metaheuristic::two_swap;
 
 use csv::Writer;
-use serde::Serialize;
 use std::io::{stderr, Stderr, Write};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};

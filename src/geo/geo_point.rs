@@ -1,6 +1,7 @@
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::f64::consts::PI;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 
 #[derive(Copy, Clone, Debug, Serialize)]
@@ -83,6 +84,12 @@ impl Ord for GeoPoint {
 }
 
 impl Eq for GeoPoint {}
+
+impl fmt::Display for GeoPoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {})", self.lat(), self.lon())
+    }
+}
 
 fn degrees_to_radians(degrees: f64) -> f64 {
     degrees * PI / 180.0

@@ -5,6 +5,7 @@ use crate::rng::rng64;
 
 use num_traits::identities::Zero;
 use num_traits::Pow;
+use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
@@ -14,7 +15,9 @@ use std::time::Instant;
 
 #[derive(Clone)]
 pub struct Ant<'a, IndexType: Clone, Nw, Ew> {
-    graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
+    graph: &'a RefCell<
+        dyn GenericWeightedGraph<IndexType = IndexType, NodeWeightType = Nw, EdgeWeightType = Ew>,
+    >,
     pheromone_matrix: &'a MatrixGraph<IndexType, (), f64>,
     goal_point: IndexType,
     max_time: Ew,
@@ -33,7 +36,13 @@ where
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        graph: &'a dyn GenericWeightedGraph<IndexType, Nw, f64>,
+        graph: &'a RefCell<
+            dyn GenericWeightedGraph<
+                IndexType = IndexType,
+                NodeWeightType = Nw,
+                EdgeWeightType = f64,
+            >,
+        >,
         pheromone_matrix: &'a MatrixGraph<IndexType, (), f64>,
         goal_point: IndexType,
         max_time: f64,
@@ -60,7 +69,7 @@ where
 
     fn weighted_heuristic(&self, to: IndexType, edge_weight: f64, tail_length: f64) -> f64 {
         self.weighted_heuristic_with_known_val(
-            *self.graph.node_weight(to).unwrap(),
+            *self.graph.borrow().node_weight(to).unwrap(),
             to,
             edge_weight,
             tail_length,
@@ -115,6 +124,7 @@ where
                 .fold(0.0, |acc, (_, weight)| acc + f64::pow(*weight, self.alpha));
             let weighted_heuristic_sum = self
                 .graph
+                .borrow()
                 .iter_neighbors(next_node)
                 .unwrap()
                 .inspect(|_| evals += 1) // increment evals for each call to heuristic
@@ -130,7 +140,7 @@ where
             for (id, pheromone_level) in self.pheromone_matrix.iter_neighbors(next_node).unwrap() {
                 // the edge weight we want to use for the heuristic needs to be got from the distance graph,
                 // not the pheromone graph, so we have to get it from there specifically
-                let distance = *self.graph.edge_weight((next_node, id)).unwrap();
+                let distance = *self.graph.borrow().edge_weight((next_node, id)).unwrap();
                 let weighted_heuristic = self.conditional_weighted_heuristic(
                     visited.contains_key(&id),
                     id,

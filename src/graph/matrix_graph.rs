@@ -1,10 +1,10 @@
 use std::cmp::Eq;
 use std::collections::HashMap;
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use crate::geo::GeoPoint;
-use crate::graph::{Edge, GenericWeightedGraph, GeoGraph, GraphError, WeightedGraph};
+use crate::graph::{Edge, GenericWeightedGraph, GraphError};
 
 #[derive(Debug, Clone)]
 pub struct MatrixGraph<IndexType: Clone, Nw, Ew> {
@@ -98,7 +98,7 @@ impl MatrixGraph<usize, (), ()> {
 
 impl<IndexType, Nw, Ew> MatrixGraph<IndexType, Nw, Ew>
 where
-    IndexType: Hash + Copy + Eq,
+    IndexType: Hash + Copy + Eq + Display + Debug,
     Nw: Copy,
     Ew: Copy,
 {
@@ -448,12 +448,16 @@ where
 }
 
 #[allow(dead_code, clippy::map_entry)]
-impl<IndexType, Nw, Ew> GenericWeightedGraph<IndexType, Nw, Ew> for MatrixGraph<IndexType, Nw, Ew>
+impl<IndexType, Nw, Ew> GenericWeightedGraph for MatrixGraph<IndexType, Nw, Ew>
 where
-    IndexType: Hash + Copy + Eq,
+    IndexType: Hash + Copy + Eq + Debug + Display,
     Nw: Copy,
     Ew: Copy,
 {
+    type IndexType = IndexType;
+    type NodeWeightType = Nw;
+    type EdgeWeightType = Ew;
+
     default fn is_empty(&self) -> bool {
         self._is_empty()
     }
@@ -470,18 +474,23 @@ where
         Box::new(self.node_map.keys().copied())
     }
 
-    default fn node_ids(&self) -> Vec<IndexType> {
+    default fn node_ids(&self) -> Vec<Self::IndexType> {
         self.iter_node_ids().collect()
     }
 
-    default fn iter_nodes(&self) -> Box<dyn Iterator<Item = (IndexType, &Nw)> + '_> {
+    default fn iter_nodes(
+        &self,
+    ) -> Box<dyn Iterator<Item = (Self::IndexType, &Self::NodeWeightType)> + '_> {
         Box::new(
             self._iter_nodes()
                 .map(move |(id, node)| (self.inv_node_map[&id], node)),
         )
     }
 
-    default fn node_weight(&self, id: IndexType) -> Result<&Nw, GraphError<IndexType>> {
+    default fn node_weight(
+        &self,
+        id: Self::IndexType,
+    ) -> Result<&Self::NodeWeightType, GraphError<Self::IndexType>> {
         if !self.node_map.contains_key(&id) {
             return Err(GraphError::MissingNode(id));
         }
@@ -492,8 +501,8 @@ where
 
     default fn iter_neighbor_ids(
         &self,
-        id: IndexType,
-    ) -> Result<Box<dyn Iterator<Item = IndexType> + '_>, GraphError<IndexType>> {
+        id: Self::IndexType,
+    ) -> Result<Box<dyn Iterator<Item = Self::IndexType> + '_>, GraphError<Self::IndexType>> {
         if !self.node_map.contains_key(&id) {
             return Err(GraphError::MissingNode(id));
         }
@@ -506,7 +515,10 @@ where
         }
     }
 
-    default fn neighbor_ids(&self, id: IndexType) -> Result<Vec<IndexType>, GraphError<IndexType>> {
+    default fn neighbor_ids(
+        &self,
+        id: Self::IndexType,
+    ) -> Result<Vec<Self::IndexType>, GraphError<Self::IndexType>> {
         let res = self.iter_neighbor_ids(id);
         match res {
             Ok(iterator) => Ok(iterator.collect()),
@@ -517,8 +529,11 @@ where
     #[allow(clippy::type_complexity)]
     default fn iter_neighbors(
         &self,
-        id: IndexType,
-    ) -> Result<Box<dyn Iterator<Item = (IndexType, &Ew)> + '_>, GraphError<IndexType>> {
+        id: Self::IndexType,
+    ) -> Result<
+        Box<dyn Iterator<Item = (Self::IndexType, &Self::EdgeWeightType)> + '_>,
+        GraphError<Self::IndexType>,
+    > {
         let inner = self._iter_neighbors(self.node_map[&id]);
         let res = self.mapped_result(inner);
         match res {
@@ -531,8 +546,8 @@ where
 
     default fn neighbors(
         &self,
-        id: IndexType,
-    ) -> Result<Vec<(IndexType, &Ew)>, GraphError<IndexType>> {
+        id: Self::IndexType,
+    ) -> Result<Vec<(Self::IndexType, &Self::EdgeWeightType)>, GraphError<Self::IndexType>> {
         let res = self.iter_neighbors(id);
         match res {
             Ok(iter) => Ok(iter.collect()),
@@ -540,11 +555,15 @@ where
         }
     }
 
-    default fn has_node(&self, id: IndexType) -> bool {
+    default fn has_node(&self, id: Self::IndexType) -> bool {
         self.node_map.contains_key(&id) && self._has_node(self.node_map[&id])
     }
 
-    default fn add_node(&mut self, id: IndexType, weight: Nw) -> Result<(), GraphError<IndexType>> {
+    default fn add_node(
+        &mut self,
+        id: Self::IndexType,
+        weight: Self::NodeWeightType,
+    ) -> Result<(), GraphError<Self::IndexType>> {
         if self.node_map.contains_key(&id) {
             return Err(GraphError::DuplicateNode(id));
         }
@@ -563,7 +582,7 @@ where
         }
     }
 
-    default fn remove_node(&mut self, id: IndexType) {
+    default fn remove_node(&mut self, id: Self::IndexType) {
         if let Some(&inner_id) = self.node_map.get(&id) {
             self.node_map.remove(&id);
             self.inv_node_map.remove(&inner_id);
@@ -571,7 +590,7 @@ where
         }
     }
 
-    default fn change_node(&mut self, id: IndexType, weight: Nw) {
+    default fn change_node(&mut self, id: Self::IndexType, weight: Self::NodeWeightType) {
         if self.node_map.contains_key(&id) {
             self._change_node(self.node_map[&id], weight);
         } else {
@@ -581,7 +600,7 @@ where
         }
     }
 
-    default fn degree(&self, id: IndexType) -> Result<usize, GraphError<IndexType>> {
+    default fn degree(&self, id: Self::IndexType) -> Result<usize, GraphError<Self::IndexType>> {
         if !self.node_map.contains_key(&id) {
             return Err(GraphError::MissingNode(id));
         }
@@ -590,41 +609,46 @@ where
         self.mapped_result(degree)
     }
 
-    default fn iter_edge_ids(&self) -> Box<dyn Iterator<Item = Edge<IndexType>> + '_> {
+    default fn iter_edge_ids(&self) -> Box<dyn Iterator<Item = Edge<Self::IndexType>> + '_> {
         Box::new(
             self._iter_edge_ids()
                 .map(move |(f_id, t_id)| (self.inv_node_map[&f_id], self.inv_node_map[&t_id])),
         )
     }
 
-    default fn edge_ids(&self) -> Vec<Edge<IndexType>> {
+    default fn edge_ids(&self) -> Vec<Edge<Self::IndexType>> {
         self.iter_edge_ids().collect()
     }
 
-    default fn iter_edges(&self) -> Box<dyn Iterator<Item = (Edge<IndexType>, &Ew)> + '_> {
+    default fn iter_edges(
+        &self,
+    ) -> Box<dyn Iterator<Item = (Edge<Self::IndexType>, &Self::EdgeWeightType)> + '_> {
         Box::new(self._iter_edges().map(move |((f_id, t_id), weight)| {
             ((self.inv_node_map[&f_id], self.inv_node_map[&t_id]), weight)
         }))
     }
 
-    default fn edges(&self) -> Vec<(Edge<IndexType>, &Ew)> {
+    default fn edges(&self) -> Vec<(Edge<Self::IndexType>, &Self::EdgeWeightType)> {
         self.iter_edges().collect()
     }
 
-    default fn edge_weight(&self, edge: Edge<IndexType>) -> Result<&Ew, GraphError<IndexType>> {
+    default fn edge_weight(
+        &self,
+        edge: Edge<Self::IndexType>,
+    ) -> Result<&Self::EdgeWeightType, GraphError<Self::IndexType>> {
         let weight = self._edge_weight((self.node_map[&edge.0], self.node_map[&edge.1]));
         self.mapped_result(weight)
     }
 
-    default fn has_edge(&self, edge: Edge<IndexType>) -> bool {
+    default fn has_edge(&self, edge: Edge<Self::IndexType>) -> bool {
         self._has_edge((self.node_map[&edge.0], self.node_map[&edge.1]))
     }
 
     default fn add_edge(
         &mut self,
-        edge: Edge<IndexType>,
+        edge: Edge<Self::IndexType>,
         weight: Ew,
-    ) -> Result<(), GraphError<IndexType>> {
+    ) -> Result<(), GraphError<Self::IndexType>> {
         if !self.node_map.contains_key(&edge.0) {
             return Err(GraphError::MissingNode(edge.0));
         } else if !self.node_map.contains_key(&edge.1) {
@@ -634,21 +658,21 @@ where
         self.mapped_result(edge)
     }
 
-    default fn remove_edge(&mut self, edge: Edge<IndexType>) {
+    default fn remove_edge(&mut self, edge: Edge<Self::IndexType>) {
         self._remove_edge((self.node_map[&edge.0], self.node_map[&edge.1]));
     }
 
     default fn change_edge(
         &mut self,
-        edge: Edge<IndexType>,
-        weight: Ew,
-    ) -> Result<(), GraphError<IndexType>> {
+        edge: Edge<Self::IndexType>,
+        weight: Self::EdgeWeightType,
+    ) -> Result<(), GraphError<Self::IndexType>> {
         let edge = self._change_edge((self.node_map[&edge.0], self.node_map[&edge.1]), weight);
         self.mapped_result(edge)
     }
 }
 
-impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<usize, Nw, Ew> {
+impl<Nw: Copy, Ew: Copy> GenericWeightedGraph for MatrixGraph<usize, Nw, Ew> {
     fn iter_node_ids(&self) -> Box<dyn Iterator<Item = usize> + '_> {
         self._iter_node_ids()
     }
@@ -724,9 +748,9 @@ impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<usi
     }
 }
 
-impl<Nw: Copy, Ew: Copy> WeightedGraph<Nw, Ew> for MatrixGraph<usize, Nw, Ew> {}
+// impl<Nw: Copy, Ew: Copy> WeightedGraph for MatrixGraph<usize, Nw, Ew> {}
 
-impl<Nw: Copy, Ew: Copy> GeoGraph<Nw, Ew> for MatrixGraph<GeoPoint, Nw, Ew> {}
+// impl<Nw: Copy, Ew: Copy> GeoGraph for MatrixGraph<GeoPoint, Nw, Ew> {}
 
 #[cfg(test)]
 mod usize_indexed_tests {

@@ -9,10 +9,10 @@ pub use erdos_renyi::ErdosRenyi;
 pub use grid::Grid;
 pub use stochastic_block::StochasticBlock;
 
-use crate::graph::WeightedGraph;
+use crate::graph::MatrixGraph;
 
 /// A Generator for weighted graphs.
 pub trait Generate<Nw, Ew> {
     /// Generates a boxed weighted graph with node weights Nw and edge weights Ew.
-    fn generate(&self) -> Box<dyn WeightedGraph<Nw, Ew>>;
+    fn generate(&mut self) -> MatrixGraph<usize, Nw, Ew>;
 }
