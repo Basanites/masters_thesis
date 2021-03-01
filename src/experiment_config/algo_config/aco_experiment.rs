@@ -8,7 +8,7 @@ pub struct AcoExperiment {
     pub alpha: f64,
     pub beta: f64,
     pub rho: f64,
-    pub seed: u128,
+    pub seed: u64,
     pub ant_count: usize,
 }
 
@@ -27,7 +27,7 @@ impl Fix<AcoExperiment> for UnseededAcoExperiment {
             beta: self.beta,
             rho: self.rho,
             ant_count: self.ant_count,
-            seed: os_random_seed(),
+            seed: (os_random_seed() >> 64) as u64,
         }
     }
 }

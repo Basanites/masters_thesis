@@ -1,7 +1,7 @@
-mod algo_config;
-mod general_experiment_config;
-mod graph_creation_config;
-mod graph_dynamics_config;
+pub mod algo_config;
+pub mod general_experiment_config;
+pub mod graph_creation_config;
+pub mod graph_dynamics_config;
 
 pub use algo_config::{AcoExperiment, AlgoConfig, TwoSwapExperiment};
 pub use general_experiment_config::GeneralExperimentConfig;

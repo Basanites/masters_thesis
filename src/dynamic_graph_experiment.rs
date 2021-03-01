@@ -28,7 +28,7 @@ impl DynamicGraphExperiment {
         }
 
         if let Ok(f) = config.graph_creation.file() {
-            let mut rng = rng64(f.seed);
+            let mut rng = rng64(f.seed as u128);
             let delta = f.nw_range.1 - f.nw_range.0;
             let mut value_gen = || rng.rand_float() * delta + f.nw_range.0;
             let pbf = import_pbf(f.filename.as_str(), &mut value_gen);
@@ -56,22 +56,27 @@ impl DynamicGraphExperiment {
         }
 
         if let Ok(grid) = config.graph_creation.grid() {
-            let mut actual_rng = rng64(grid.seed);
+            let mut actual_rng = rng64(grid.seed as u128);
             let nw_delta = grid.nw_range.1 - grid.nw_range.0;
             let nw_gen = |mut rng: Rand64| rng.rand_float() * nw_delta + grid.nw_range.0;
             let ew_delta = grid.ew_range.1 - grid.ew_range.0;
             let ew_gen = |mut rng: Rand64| rng.rand_float() * ew_delta + grid.ew_range.0;
-            let mut grid_gen = Grid::new(grid.size, &nw_gen, &ew_gen, &mut actual_rng);
+            let mut grid_gen = Grid::new(
+                (grid.size.0 as usize, grid.size.1 as usize),
+                &nw_gen,
+                &ew_gen,
+                &mut actual_rng,
+            );
             let graph = grid_gen.generate();
             Self::run_experiment(config, heuristic, graph, filename)
         } else if let Ok(er) = config.graph_creation.erdos_renyi() {
-            let mut actual_rng = rng64(er.seed);
+            let mut actual_rng = rng64(er.seed as u128);
             let nw_delta = er.nw_range.1 - er.nw_range.0;
             let nw_gen = |mut rng: Rand64| rng.rand_float() * nw_delta + er.nw_range.0;
             let ew_delta = er.ew_range.1 - er.ew_range.0;
             let ew_gen = |mut rng: Rand64| rng.rand_float() * ew_delta + er.ew_range.0;
             let mut er_gen = ErdosRenyi::new(
-                er.size,
+                (er.size.0 as usize, er.size.1 as usize),
                 er.connection_probability,
                 &nw_gen,
                 &ew_gen,
@@ -94,11 +99,11 @@ impl DynamicGraphExperiment {
     ) -> Result<(), ExperimentConfigError> {
         let experiment_cfg = config.experiment.cfg();
         let g_nodes = graph.node_ids();
-        let mut start_rng = rng64(experiment_cfg.seed);
+        let mut start_rng = rng64(experiment_cfg.seed as u128);
         let start_node = g_nodes[(start_rng.rand_float() * g_nodes.len() as f64) as usize];
         let graph_rc = RefCell::new(graph);
         let dynamcis_cfg = config.graph_dynamics.cfg();
-        let mut dyn_rng = rng64(dynamcis_cfg.seed);
+        let mut dyn_rng = rng64(dynamcis_cfg.seed as u128);
         let instance = ProblemInstance::new(&graph_rc, start_node, experiment_cfg.max_time);
         let fw = File::create(filename).unwrap();
 
@@ -108,7 +113,7 @@ impl DynamicGraphExperiment {
                 aco_cfg.alpha,
                 aco_cfg.beta,
                 aco_cfg.rho,
-                Some(aco_cfg.seed),
+                Some(aco_cfg.seed as u128),
                 aco_cfg.ant_count,
             );
             let supervisor =

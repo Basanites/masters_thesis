@@ -5,8 +5,8 @@ use crate::rng::os_random_seed;
 
 #[derive(Copy, Clone, Deserialize, Serialize, Debug)]
 pub struct ErdosRenyiGeneration {
-    pub seed: u128,
-    pub size: (usize, usize),
+    pub seed: u64,
+    pub size: (u64, u64),
     pub nw_range: (f64, f64),
     pub ew_range: (f64, f64),
     pub node_weight_probability: f64,
@@ -15,7 +15,7 @@ pub struct ErdosRenyiGeneration {
 
 #[derive(Copy, Clone, Deserialize, Serialize, Debug)]
 pub struct UnseededErdosRenyiGeneration {
-    pub size: (usize, usize),
+    pub size: (u64, u64),
     pub nw_range: (f64, f64),
     pub ew_range: (f64, f64),
     pub node_weight_probability: f64,
@@ -25,7 +25,7 @@ pub struct UnseededErdosRenyiGeneration {
 impl Fix<ErdosRenyiGeneration> for UnseededErdosRenyiGeneration {
     fn to_fixed(&self) -> ErdosRenyiGeneration {
         ErdosRenyiGeneration {
-            seed: os_random_seed(),
+            seed: (os_random_seed() >> 64) as u64,
             size: self.size,
             nw_range: self.nw_range,
             ew_range: self.ew_range,

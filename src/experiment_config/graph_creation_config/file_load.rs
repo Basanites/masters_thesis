@@ -6,7 +6,7 @@ use crate::rng::os_random_seed;
 #[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct FileLoad {
     pub filename: String,
-    pub seed: u128,
+    pub seed: u64,
     pub nw_range: (f64, f64),
 }
 
@@ -20,7 +20,7 @@ impl Fix<FileLoad> for UnseededFileLoad {
     fn to_fixed(&self) -> FileLoad {
         FileLoad {
             filename: self.filename.clone(),
-            seed: os_random_seed(),
+            seed: (os_random_seed() >> 64) as u64,
             nw_range: self.nw_range,
         }
     }

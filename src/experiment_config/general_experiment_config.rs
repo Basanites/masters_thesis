@@ -27,7 +27,7 @@ impl GeneralExperimentConfig {
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 pub struct FullConfig {
     pub finished: bool,
-    pub seed: u128,
+    pub seed: u64,
     pub aggregation_rate: usize,
     pub max_time: f64,
 }
@@ -36,7 +36,7 @@ experiment! {FullConfig}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct NoStatConfig {
-    pub seed: u128,
+    pub seed: u64,
     pub aggregation_rate: usize,
     pub max_time: f64,
 }
@@ -63,7 +63,7 @@ impl Fix<FullConfig> for UnseededConfig {
     fn to_fixed(&self) -> FullConfig {
         FullConfig {
             finished: self.finished,
-            seed: os_random_seed(),
+            seed: (os_random_seed() >> 64) as u64,
             aggregation_rate: self.aggregation_rate,
             max_time: self.max_time,
         }
@@ -80,7 +80,7 @@ impl Fix<FullConfig> for AggregationOnly {
     fn to_fixed(&self) -> FullConfig {
         FullConfig {
             finished: false,
-            seed: os_random_seed(),
+            seed: (os_random_seed() >> 64) as u64,
             aggregation_rate: self.aggregation_rate,
             max_time: self.max_time,
         }
