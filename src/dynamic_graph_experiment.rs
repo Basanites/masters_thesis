@@ -56,31 +56,29 @@ impl DynamicGraphExperiment {
         }
 
         if let Ok(grid) = config.graph_creation.grid() {
-            let mut actual_rng = rng64(grid.seed as u128);
+            let rc = RefCell::new(rng64(grid.seed as u128));
             let nw_delta = grid.nw_range.1 - grid.nw_range.0;
-            let nw_gen = |rng: &mut Rand64| rng.rand_float() * nw_delta + grid.nw_range.0;
+            let mut nw_gen = || rc.borrow_mut().rand_float() * nw_delta + grid.nw_range.0;
             let ew_delta = grid.ew_range.1 - grid.ew_range.0;
-            let ew_gen = |rng: &mut Rand64| rng.rand_float() * ew_delta + grid.ew_range.0;
+            let mut ew_gen = || rc.borrow_mut().rand_float() * ew_delta + grid.ew_range.0;
             let mut grid_gen = Grid::new(
                 (grid.size.0 as usize, grid.size.1 as usize),
-                &nw_gen,
-                &ew_gen,
-                &mut actual_rng,
+                &mut nw_gen,
+                &mut ew_gen,
             );
             let graph = grid_gen.generate();
             Self::run_experiment(config, heuristic, graph, filename)
         } else if let Ok(er) = config.graph_creation.erdos_renyi() {
-            let mut actual_rng = rng64(er.seed as u128);
+            let rc = RefCell::new(rng64(er.seed as u128));
             let nw_delta = er.nw_range.1 - er.nw_range.0;
-            let nw_gen = |rng: &mut Rand64| rng.rand_float() * nw_delta + er.nw_range.0;
+            let mut nw_gen = || rc.borrow_mut().rand_float() * nw_delta + er.nw_range.0;
             let ew_delta = er.ew_range.1 - er.ew_range.0;
-            let ew_gen = |rng: &mut Rand64| rng.rand_float() * ew_delta + er.ew_range.0;
+            let mut ew_gen = || rc.borrow_mut().rand_float() * ew_delta + er.ew_range.0;
             let mut er_gen = ErdosRenyi::new(
-                (er.size.0 as usize, er.size.1 as usize),
+                er.size as usize,
                 er.connection_probability,
-                &nw_gen,
-                &ew_gen,
-                &mut actual_rng,
+                &mut nw_gen,
+                &mut ew_gen,
             );
             let graph = er_gen.generate();
             Self::run_experiment(config, heuristic, graph, filename)
