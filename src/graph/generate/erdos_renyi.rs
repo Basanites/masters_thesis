@@ -10,8 +10,8 @@ where
 {
     size: (usize, usize),
     connection_probability: f64,
-    nw_generator: &'a dyn Fn(Rand64) -> Nw,
-    ew_generator: &'a dyn Fn(Rand64) -> Ew,
+    nw_generator: &'a dyn Fn(&mut Rand64) -> Nw,
+    ew_generator: &'a dyn Fn(&mut Rand64) -> Ew,
     rng: &'a mut Rand64,
 }
 
@@ -19,8 +19,8 @@ impl<'a, Nw: Clone, Ew: Clone> ErdosRenyi<'a, Nw, Ew> {
     pub fn new(
         size: (usize, usize),
         connection_probability: f64,
-        nw_generator: &'a dyn Fn(Rand64) -> Nw,
-        ew_generator: &'a dyn Fn(Rand64) -> Ew,
+        nw_generator: &'a dyn Fn(&mut Rand64) -> Nw,
+        ew_generator: &'a dyn Fn(&mut Rand64) -> Ew,
         rng: &'a mut Rand64,
     ) -> ErdosRenyi<'a, Nw, Ew> {
         ErdosRenyi {
@@ -42,7 +42,9 @@ impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for ErdosRenyi
         // Populate nodes with random weights in range.
         for i in 0..self.size.0 {
             // Unwrapping is fine, because the graph was just created, so we cant insert duplicates.
-            graph.add_node(i, (self.nw_generator)(*self.rng)).unwrap();
+            graph
+                .add_node(i, (self.nw_generator)(&mut self.rng))
+                .unwrap();
         }
 
         // Populate edges with given probablity and weight in specified range.
@@ -51,7 +53,7 @@ impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for ErdosRenyi
                 if rng.rand_float() <= self.connection_probability {
                     // Unwrapping is fine, because all nodes in the range were just created.
                     graph
-                        .add_edge((i, j), (self.ew_generator)(*self.rng))
+                        .add_edge((i, j), (self.ew_generator)(&mut self.rng))
                         .unwrap();
                 }
             }

@@ -16,7 +16,7 @@ use geo::GeoPoint;
 
 use glob::glob;
 use std::fs::{create_dir, write, File};
-use std::io::{Error, ErrorKind};
+use std::io::ErrorKind;
 
 type UsizeHeuristic = dyn Fn(f64, f64, usize, f64) -> f64;
 type GeoPointHeuristic = dyn Fn(f64, f64, GeoPoint, f64) -> f64;

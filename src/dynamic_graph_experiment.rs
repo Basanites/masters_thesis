@@ -58,9 +58,9 @@ impl DynamicGraphExperiment {
         if let Ok(grid) = config.graph_creation.grid() {
             let mut actual_rng = rng64(grid.seed as u128);
             let nw_delta = grid.nw_range.1 - grid.nw_range.0;
-            let nw_gen = |mut rng: Rand64| rng.rand_float() * nw_delta + grid.nw_range.0;
+            let nw_gen = |rng: &mut Rand64| rng.rand_float() * nw_delta + grid.nw_range.0;
             let ew_delta = grid.ew_range.1 - grid.ew_range.0;
-            let ew_gen = |mut rng: Rand64| rng.rand_float() * ew_delta + grid.ew_range.0;
+            let ew_gen = |rng: &mut Rand64| rng.rand_float() * ew_delta + grid.ew_range.0;
             let mut grid_gen = Grid::new(
                 (grid.size.0 as usize, grid.size.1 as usize),
                 &nw_gen,
@@ -72,9 +72,9 @@ impl DynamicGraphExperiment {
         } else if let Ok(er) = config.graph_creation.erdos_renyi() {
             let mut actual_rng = rng64(er.seed as u128);
             let nw_delta = er.nw_range.1 - er.nw_range.0;
-            let nw_gen = |mut rng: Rand64| rng.rand_float() * nw_delta + er.nw_range.0;
+            let nw_gen = |rng: &mut Rand64| rng.rand_float() * nw_delta + er.nw_range.0;
             let ew_delta = er.ew_range.1 - er.ew_range.0;
-            let ew_gen = |mut rng: Rand64| rng.rand_float() * ew_delta + er.ew_range.0;
+            let ew_gen = |rng: &mut Rand64| rng.rand_float() * ew_delta + er.ew_range.0;
             let mut er_gen = ErdosRenyi::new(
                 (er.size.0 as usize, er.size.1 as usize),
                 er.connection_probability,
@@ -127,6 +127,7 @@ impl DynamicGraphExperiment {
                 }
                 i += 1;
             }
+            aco_algo.supervisor.aggregate_receive();
         } else if config.algorithm.two_swap().is_ok() {
             let params = two_swap::Params::new(heuristic);
             let supervisor =
@@ -140,6 +141,7 @@ impl DynamicGraphExperiment {
                 }
                 i += 1;
             }
+            two_swap_algo.supervisor.aggregate_receive();
         } else {
             return Err(ExperimentConfigError::InvalidGraphConfig(
                 "No valid Algorithm config supplied.".to_string(),

@@ -1,5 +1,5 @@
 use super::Generate;
-use crate::graph::{GenericWeightedGraph, MatrixGraph, WeightedGraph};
+use crate::graph::{GenericWeightedGraph, MatrixGraph};
 use crate::rng::preseeded_rng64;
 use oorandom::Rand64;
 

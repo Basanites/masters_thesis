@@ -2,6 +2,7 @@ use super::Generate;
 use crate::graph::{GenericWeightedGraph, MatrixGraph};
 use oorandom::Rand64;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 
 pub struct Grid<'a, Nw, Ew>
@@ -10,8 +11,8 @@ where
     Ew: Clone,
 {
     size: (usize, usize),
-    nw_generator: &'a dyn Fn(Rand64) -> Nw,
-    ew_generator: &'a dyn Fn(Rand64) -> Ew,
+    nw_generator: &'a dyn Fn(&mut Rand64) -> Nw,
+    ew_generator: &'a dyn Fn(&mut Rand64) -> Ew,
     rng: &'a mut Rand64,
     phantom: PhantomData<(Nw, Ew)>,
 }
@@ -19,8 +20,8 @@ where
 impl<'a, Nw: Clone, Ew: Clone> Grid<'a, Nw, Ew> {
     pub fn new(
         size: (usize, usize),
-        nw_generator: &'a dyn Fn(Rand64) -> Nw,
-        ew_generator: &'a dyn Fn(Rand64) -> Ew,
+        nw_generator: &'a dyn Fn(&mut Rand64) -> Nw,
+        ew_generator: &'a dyn Fn(&mut Rand64) -> Ew,
         rng: &'a mut Rand64,
     ) -> Grid<'a, Nw, Ew> {
         Grid {
@@ -35,7 +36,9 @@ impl<'a, Nw: Clone, Ew: Clone> Grid<'a, Nw, Ew> {
 
 /// 'static lifetime needed here. See https://stackoverflow.com/questions/32625583/parameter-type-may-not-live-long-enough for explanation.
 /// tldr: Any type without stored references satisfies any lifetime. Thus e.g. all primitives satisfy 'static.
-impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for Grid<'a, Nw, Ew> {
+impl<'a, Nw: 'static + Copy + Debug, Ew: 'static + Copy + Debug> Generate<Nw, Ew>
+    for Grid<'a, Nw, Ew>
+{
     fn generate(&mut self) -> MatrixGraph<usize, Nw, Ew> {
         let mut graph = MatrixGraph::<usize, Nw, Ew>::with_size(self.size.0 * self.size.1);
 
@@ -48,7 +51,7 @@ impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for Grid<'a, N
             for j in 0..self.size.1 {
                 id_map.insert((i, j), count);
                 graph
-                    .add_node(count, (self.nw_generator)(*self.rng))
+                    .add_node(count, (self.nw_generator)(&mut self.rng))
                     .unwrap();
                 count += 1;
             }
@@ -60,7 +63,7 @@ impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for Grid<'a, N
                     graph
                         .add_edge(
                             (id_map[&(i, j)], id_map[&(i + 1, j)]),
-                            (self.ew_generator)(*self.rng),
+                            (self.ew_generator)(&mut self.rng),
                         )
                         .unwrap();
                 }
@@ -68,7 +71,7 @@ impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for Grid<'a, N
                     graph
                         .add_edge(
                             (id_map[&(i, j)], id_map[&(i - 1, j)]),
-                            (self.ew_generator)(*self.rng),
+                            (self.ew_generator)(&mut self.rng),
                         )
                         .unwrap();
                 }
@@ -76,7 +79,7 @@ impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for Grid<'a, N
                     graph
                         .add_edge(
                             (id_map[&(i, j)], id_map[&(i, j + 1)]),
-                            (self.ew_generator)(*self.rng),
+                            (self.ew_generator)(&mut self.rng),
                         )
                         .unwrap();
                 }
@@ -84,13 +87,14 @@ impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for Grid<'a, N
                     graph
                         .add_edge(
                             (id_map[&(i, j)], id_map[&(i, j - 1)]),
-                            (self.ew_generator)(*self.rng),
+                            (self.ew_generator)(&mut self.rng),
                         )
                         .unwrap();
                 }
             }
         }
 
+        println!("{:?}", graph.edges());
         graph
     }
 }

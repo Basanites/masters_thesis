@@ -209,11 +209,11 @@ pub fn import_pbf(
     path: &str,
     nw_gen: &mut dyn FnMut() -> f64,
 ) -> Result<MatrixGraph<GeoPoint, f64, f64>, ImportError> {
-    let mut file_open = File::open(path);
-    let mut file;
+    let file_open = File::open(path);
+    let file;
     match file_open {
         Ok(f) => file = f,
-        Err(e) => return Err(ImportError::MissingFile(path.to_string())),
+        Err(_e) => return Err(ImportError::MissingFile(path.to_string())),
     };
 
     let mut pbf = OsmPbfReader::new(file);

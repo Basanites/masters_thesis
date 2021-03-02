@@ -39,7 +39,7 @@ pub struct Aco<'a, IndexType: Clone, Nw, Ew, W: Write> {
     best_solution: Solution<IndexType>,
     best_score: Nw,
     best_length: Ew,
-    supervisor: Supervisor<W>,
+    pub supervisor: Supervisor<W>,
     rng: Rand64,
 }
 
