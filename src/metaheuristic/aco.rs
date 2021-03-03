@@ -16,14 +16,21 @@ use crate::rng::rng64;
 
 use num_traits::identities::Zero;
 use oorandom::Rand64;
+use serde::Serialize;
 use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::io::Write;
+use std::ops::Add;
 use std::time::Instant;
 
-pub struct Aco<'a, IndexType: Clone, Nw, Ew, W: Write> {
+pub struct Aco<'a, IndexType, Nw, Ew, W>
+where
+    IndexType: Clone,
+    W: Write,
+    Ew: Serialize + Add<Output = Ew>,
+{
     graph: &'a RefCell<
         dyn GenericWeightedGraph<IndexType = IndexType, NodeWeightType = Nw, EdgeWeightType = Ew>,
     >,
@@ -39,7 +46,7 @@ pub struct Aco<'a, IndexType: Clone, Nw, Ew, W: Write> {
     best_solution: Solution<IndexType>,
     best_score: Nw,
     best_length: Ew,
-    pub supervisor: Supervisor<W>,
+    pub supervisor: Supervisor<W, Ew>,
     rng: Rand64,
 }
 
@@ -68,17 +75,16 @@ where
     }
 }
 
-impl<'a, IndexType, Nw, W> Metaheuristic<'a, IndexType, Nw, f64> for Aco<'a, IndexType, Nw, f64, W>
+impl<'a, IndexType, W> Metaheuristic<'a, IndexType, f64, f64> for Aco<'a, IndexType, f64, f64, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Zero + PartialOrd,
     W: Write,
 {
-    type Params = Params<'a, IndexType, Nw, f64>;
-    type SupervisorType = Supervisor<W>;
+    type Params = Params<'a, IndexType, f64, f64>;
+    type SupervisorType = Supervisor<W, f64>;
 
     fn new(
-        problem: ProblemInstance<'a, IndexType, Nw, f64>,
+        problem: ProblemInstance<'a, IndexType, f64, f64>,
         params: Self::Params,
         supervisor: Self::SupervisorType,
     ) -> Self {
@@ -107,7 +113,7 @@ where
             q: 1.0,
             ant_count: params.ant_count,
             best_solution: Solution::new(),
-            best_score: Nw::zero(),
+            best_score: f64::zero(),
             best_length: f64::zero(),
             supervisor,
             rng: rng64(params.seed),
@@ -141,11 +147,13 @@ where
 
         let start_time = Instant::now();
         let mut best_length = f64::zero();
-        let mut best_score = Nw::zero();
+        let mut best_score = f64::zero();
         let mut best_solution = Solution::new();
+        let mut improvements = 0;
         for solution in solutions.into_iter() {
             if let Ok((score, length)) = solution_score_and_length(&solution, self.graph) {
                 if length <= self.max_time && score > best_score {
+                    improvements += 1;
                     best_score = score;
                     best_length = length;
                     best_solution = solution;
@@ -154,7 +162,17 @@ where
         }
 
         let duration = start_time.elapsed();
-        let _ = self.supervisor.sender.send(Message::new(0, 0, duration)); // Ant 0 is always supervisor
+        let _ = self.supervisor.sender.send(Message::new(
+            0,
+            0,
+            0,
+            improvements,
+            improvements,
+            0,
+            duration,
+            best_length,
+            best_score,
+        )); // Ant 0 is always supervisor
         self.supervisor.aggregate_receive();
         self.supervisor.reset();
         if best_score > self.best_score {

@@ -5,6 +5,7 @@ use crate::rng::rng64;
 
 use num_traits::identities::Zero;
 use num_traits::Pow;
+use serde::Serialize;
 use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
@@ -14,7 +15,10 @@ use std::sync::mpsc::Sender;
 use std::time::Instant;
 
 #[derive(Clone)]
-pub struct Ant<'a, IndexType: Clone, Nw, Ew> {
+pub struct Ant<'a, IndexType: Clone, Nw, Ew>
+where
+    Ew: Serialize,
+{
     graph: &'a RefCell<
         dyn GenericWeightedGraph<IndexType = IndexType, NodeWeightType = Nw, EdgeWeightType = Ew>,
     >,
@@ -25,7 +29,7 @@ pub struct Ant<'a, IndexType: Clone, Nw, Ew> {
     beta: f64,
     rng_seed: u128,
     heuristic: &'a Heuristic<IndexType, Nw, Ew>,
-    sender: Sender<Message>,
+    sender: Sender<Message<Ew>>,
     id: usize,
 }
 
@@ -50,7 +54,7 @@ where
         rng_seed: u128,
         alpha: f64,
         beta: f64,
-        sender: Sender<Message>,
+        sender: Sender<Message<f64>>,
         id: usize,
     ) -> Self {
         Ant {
@@ -107,6 +111,9 @@ where
     pub fn get_solution(&self) -> Solution<IndexType> {
         let start_time = Instant::now();
         let mut evals = 0;
+        let mut n_improvements = 0;
+        let mut changes = 0;
+        let mut score = 0.0;
         let mut rng = rng64(self.rng_seed);
         let mut solution = Solution::new();
         solution.push_node(self.goal_point);
@@ -156,6 +163,7 @@ where
                     solution.push_node(id);
                     tail_length += distance;
                     visited.insert(id, true);
+                    changes += 1;
                     if id == self.goal_point {
                         goal_reached = true;
                     }
@@ -166,9 +174,17 @@ where
         }
 
         // TODO: log errors from sending here
-        let _res = self
-            .sender
-            .send(Message::new(self.id, evals, start_time.elapsed()));
+        let _res = self.sender.send(Message::new(
+            self.id,
+            0,
+            evals,
+            n_improvements,
+            changes,
+            0,
+            start_time.elapsed(),
+            tail_length,
+            score,
+        ));
         solution
     }
 }

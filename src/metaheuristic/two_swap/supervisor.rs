@@ -3,20 +3,27 @@ use crate::metaheuristic::supervisor::{Message, MessageInfo};
 use crate::metaheuristic::two_swap;
 
 use csv::Writer;
+use serde::Serialize;
+use std::default::Default;
 use std::io::{stderr, Stderr, Write};
+use std::ops::Add;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
-pub struct Supervisor<W: Write> {
-    sender: Sender<two_swap::Message>,
-    receiver: Receiver<two_swap::Message>,
-    messages: Vec<MessageInfo>,
+pub struct Supervisor<W: Write, Ew: Serialize + Sized> {
+    sender: Sender<two_swap::Message<Ew>>,
+    receiver: Receiver<two_swap::Message<Ew>>,
+    messages: Vec<MessageInfo<Ew>>,
     writer: Writer<W>,
     aggregation_rate: usize,
 }
 
-impl<W: Write> Supervisor<W> {
+impl<W, Ew> Supervisor<W, Ew>
+where
+    W: Write,
+    Ew: Serialize + Default + Add<Output = Ew> + Copy,
+{
     pub fn new(aggregation_rate: usize, writer: Writer<W>) -> Self {
         let (tx, rx) = mpsc::channel();
         Supervisor {
@@ -28,7 +35,7 @@ impl<W: Write> Supervisor<W> {
         }
     }
 
-    pub fn sender(&self) -> Sender<two_swap::Message> {
+    pub fn sender(&self) -> Sender<two_swap::Message<Ew>> {
         self.sender.clone()
     }
 
@@ -46,10 +53,12 @@ impl<W: Write> Supervisor<W> {
             let record = two_swap::Message::new(
                 i * self.aggregation_rate,
                 msg_info.evaluations,
-                0,
-                0,
-                0,
+                msg_info.n_improvements,
+                msg_info.changes,
+                msg_info.phase,
                 msg_info.cpu_time,
+                msg_info.distance,
+                msg_info.score,
             );
             let res = self.writer.serialize(record);
             if let Err(err) = res {
@@ -59,9 +68,17 @@ impl<W: Write> Supervisor<W> {
     }
 }
 
-impl<W: Write> supervisor::Supervisor<two_swap::Message> for Supervisor<W> {}
+impl<W, Ew: Copy> supervisor::Supervisor<two_swap::Message<Ew>> for Supervisor<W, Ew>
+where
+    W: Write,
+    Ew: Serialize + Default + Add<Output = Ew>,
+{
+}
 
-impl Default for Supervisor<Stderr> {
+impl<Ew> Default for Supervisor<Stderr, Ew>
+where
+    Ew: Serialize + Default + Add<Output = Ew>,
+{
     fn default() -> Self {
         let (tx, rx) = mpsc::channel();
         Supervisor {

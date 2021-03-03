@@ -3,22 +3,28 @@ use crate::metaheuristic::supervisor;
 use crate::metaheuristic::supervisor::{Message, MessageInfo};
 
 use csv::Writer;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{stderr, Stderr, Write};
+use std::ops::Add;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
-pub struct Supervisor<W: Write> {
-    pub sender: Sender<aco::Message>,
-    receiver: Receiver<aco::Message>,
+pub struct Supervisor<W: Write, Ew: Serialize + Sized> {
+    pub sender: Sender<aco::Message<Ew>>,
+    receiver: Receiver<aco::Message<Ew>>,
     ants: usize,
-    messages: HashMap<usize, Vec<MessageInfo>>,
+    messages: HashMap<usize, Vec<MessageInfo<Ew>>>,
     counters: HashMap<usize, usize>,
     aggregation_rate: usize,
     writer: Writer<W>,
 }
 
-impl<W: Write> Supervisor<W> {
+impl<W, Ew> Supervisor<W, Ew>
+where
+    W: Write,
+    Ew: Serialize + Default + Add<Output = Ew> + Copy,
+{
     pub fn new(aggregation_rate: usize, writer: Writer<W>) -> Self {
         let (tx, rx) = mpsc::channel();
         Supervisor {
@@ -32,7 +38,7 @@ impl<W: Write> Supervisor<W> {
         }
     }
 
-    pub fn new_ant(&mut self) -> (Sender<aco::Message>, usize) {
+    pub fn new_ant(&mut self) -> (Sender<aco::Message<Ew>>, usize) {
         self.ants += 1;
         let id = self.ants;
 
@@ -70,9 +76,17 @@ impl<W: Write> Supervisor<W> {
     }
 }
 
-impl<W: Write> supervisor::Supervisor<aco::Message> for Supervisor<W> {}
+impl<W, Ew: Copy> supervisor::Supervisor<aco::Message<Ew>> for Supervisor<W, Ew>
+where
+    W: Write,
+    Ew: Serialize + Default + Add<Output = Ew>,
+{
+}
 
-impl Default for Supervisor<Stderr> {
+impl<Ew> Default for Supervisor<Stderr, Ew>
+where
+    Ew: Serialize + Default + Add<Output = Ew>,
+{
     fn default() -> Self {
         let (tx, rx) = mpsc::channel();
         Supervisor {

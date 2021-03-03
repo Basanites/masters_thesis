@@ -10,9 +10,11 @@ use crate::graph::GenericWeightedGraph;
 use crate::metaheuristic::{solution_length, Heuristic, Metaheuristic, ProblemInstance, Solution};
 
 use num_traits::identities::Zero;
+use serde::Serialize;
 use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
+use std::default::Default;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::io::Write;
@@ -20,7 +22,7 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Sub, SubAssign};
 use std::time::Instant;
 
-pub struct TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType, W: Write> {
+pub struct TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType: Serialize + Default, W: Write> {
     graph: &'a RefCell<
         dyn GenericWeightedGraph<
             IndexType = IndexType,
@@ -34,7 +36,7 @@ pub struct TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType, W: Write> {
     best_solution: Solution<IndexType>,
     best_score: f64,
     best_length: EdgeWeightType,
-    pub supervisor: Supervisor<W>,
+    pub supervisor: Supervisor<W, EdgeWeightType>,
     i: usize,
 }
 
@@ -51,7 +53,9 @@ where
         + SubAssign
         + PartialOrd
         + Sum
-        + Div<Output = EdgeWeightType>,
+        + Div<Output = EdgeWeightType>
+        + Default
+        + Serialize,
     W: Write,
 {
     fn score(
@@ -122,8 +126,17 @@ where
             self.best_length = solution_length(&self.best_solution, self.graph).unwrap();
         }
 
-        tx.send(Message::new(self.i, evals, 0, 0, 0, start_time.elapsed()))
-            .unwrap();
+        tx.send(Message::new(
+            self.i,
+            evals,
+            0,
+            1,
+            0,
+            start_time.elapsed(),
+            self.best_length,
+            self.best_score,
+        ))
+        .unwrap();
         self.i += 1;
     }
 
@@ -150,11 +163,13 @@ where
         + SubAssign
         + PartialOrd
         + Sum
-        + Div<Output = Ew>,
+        + Div<Output = Ew>
+        + Default
+        + Serialize,
     W: Write,
 {
     type Params = Params<'a, IndexType, Nw, Ew>;
-    type SupervisorType = Supervisor<W>;
+    type SupervisorType = Supervisor<W, Ew>;
 
     fn new(
         problem: ProblemInstance<'a, IndexType, Nw, Ew>,
@@ -189,6 +204,8 @@ where
         let mut score = 0.0;
         let mut temp_score: f64;
         let mut temp_new_distance = tail_length;
+        let mut improvements = 0;
+        let mut changes = 0;
         for (from, to) in self.best_solution.iter_edges() {
             let original_distance = *self.graph.borrow().edge_weight((*from, *to)).unwrap();
             temp_visited.insert(*from, true);
@@ -231,6 +248,8 @@ where
 
             head_length -= original_distance;
             if best_follow != *to {
+                improvements += 1;
+                changes += 2;
                 temp_visited.insert(best_follow, true);
                 temp_visited.insert(*to, true);
                 new_best.push_node(best_follow);
@@ -244,8 +263,17 @@ where
             score += max;
         }
 
-        tx.send(Message::new(self.i, evals, 0, 0, 0, start_time.elapsed()))
-            .unwrap();
+        tx.send(Message::new(
+            self.i,
+            evals,
+            improvements,
+            changes,
+            0,
+            start_time.elapsed(),
+            tail_length,
+            score,
+        ))
+        .unwrap();
         self.i += 1;
 
         if score > self.best_score {
@@ -273,7 +301,9 @@ where
         + SubAssign
         + PartialOrd
         + Sum
-        + Div<Output = Ew>,
+        + Div<Output = Ew>
+        + Default
+        + Serialize,
     W: Write,
 {
     type Item = Solution<IndexType>;

@@ -5,16 +5,18 @@ use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::time::Duration;
 
 #[derive(Debug)]
-pub struct Message {
+pub struct Message<Ew> {
     pub iteration: usize,
     evaluations: usize,
     n_improvements: usize,
     changes: usize,
     phase: usize,
     cpu_time: Duration,
+    distance: Ew,
+    score: f64,
 }
 
-impl Message {
+impl<Ew> Message<Ew> {
     pub fn new(
         iteration: usize,
         evaluations: usize,
@@ -22,6 +24,8 @@ impl Message {
         changes: usize,
         phase: usize,
         cpu_time: Duration,
+        distance: Ew,
+        score: f64,
     ) -> Self {
         Self {
             iteration,
@@ -30,17 +34,41 @@ impl Message {
             changes,
             phase,
             cpu_time,
+            distance,
+            score,
+        }
+    }
+
+    pub fn from_info(iteration: usize, info: MessageInfo<Ew>) -> Self {
+        Self {
+            iteration,
+            evaluations: info.evaluations,
+            n_improvements: info.n_improvements,
+            changes: info.changes,
+            phase: info.phase,
+            cpu_time: info.cpu_time,
+            distance: info.distance,
+            score: info.score,
         }
     }
 }
 
-impl supervisor::Message for Message {
-    fn get_info(&self) -> MessageInfo {
-        MessageInfo::new(self.evaluations, self.cpu_time)
+impl<Ew: Copy> supervisor::Message for Message<Ew> {
+    type EwType = Ew;
+    fn get_info(&self) -> MessageInfo<Ew> {
+        MessageInfo::new(
+            self.evaluations,
+            self.n_improvements,
+            self.changes,
+            self.phase,
+            self.cpu_time,
+            self.distance,
+            self.score,
+        )
     }
 }
 
-impl Serialize for Message {
+impl<Ew: Serialize> Serialize for Message<Ew> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -53,6 +81,8 @@ impl Serialize for Message {
         state.serialize_field("changes", &self.changes)?;
         state.serialize_field("phase", &self.phase)?;
         state.serialize_field("cpu_time_mus", &self.cpu_time.as_micros())?;
+        state.serialize_field("time", &self.distance)?;
+        state.serialize_field("value", &self.score)?;
         state.end()
     }
 }
