@@ -53,6 +53,7 @@ impl<'a, Nw: 'static + Copy + Debug, Ew: 'static + Copy + Debug> Generate<Nw, Ew
 
         for i in 0..self.size.0 {
             for j in 0..self.size.1 {
+                // add edge to right neighbor
                 if i < self.size.0 - 1 {
                     graph
                         .add_edge(
@@ -61,6 +62,7 @@ impl<'a, Nw: 'static + Copy + Debug, Ew: 'static + Copy + Debug> Generate<Nw, Ew
                         )
                         .unwrap();
                 }
+                // add edge to left neighbor
                 if i > 0 {
                     graph
                         .add_edge(
@@ -69,6 +71,7 @@ impl<'a, Nw: 'static + Copy + Debug, Ew: 'static + Copy + Debug> Generate<Nw, Ew
                         )
                         .unwrap();
                 }
+                // add edge to below neighbor
                 if j < self.size.1 - 1 {
                     graph
                         .add_edge(
@@ -77,10 +80,29 @@ impl<'a, Nw: 'static + Copy + Debug, Ew: 'static + Copy + Debug> Generate<Nw, Ew
                         )
                         .unwrap();
                 }
+                // add edge to above neighbor
                 if j > 0 {
                     graph
                         .add_edge(
                             (id_map[&(i, j)], id_map[&(i, j - 1)]),
+                            (self.ew_generator)(),
+                        )
+                        .unwrap();
+                }
+                // add edge to right below neighbor
+                if i < self.size.0 - 1 && j < self.size.1 - 1 {
+                    graph
+                        .add_edge(
+                            (id_map[&(i, j)], id_map[&(i + 1, j + 1)]),
+                            (self.ew_generator)(),
+                        )
+                        .unwrap();
+                }
+                // add edge to above left neighbor
+                if i > 0 && j > 0 {
+                    graph
+                        .add_edge(
+                            (id_map[&(i, j)], id_map[&(i - 1, j - 1)]),
                             (self.ew_generator)(),
                         )
                         .unwrap();
