@@ -7,13 +7,13 @@ use std::time::Duration;
 #[derive(Debug)]
 pub struct Message<Ew> {
     pub iteration: usize,
-    evaluations: usize,
-    n_improvements: usize,
-    changes: usize,
-    phase: usize,
-    cpu_time: Duration,
-    distance: Ew,
-    score: f64,
+    pub evaluations: usize,
+    pub n_improvements: usize,
+    pub changes: usize,
+    pub phase: usize,
+    pub cpu_time: Duration,
+    pub distance: Ew,
+    pub score: f64,
 }
 
 impl<Ew> Message<Ew> {
