@@ -202,6 +202,7 @@ where
         let mut temp_visited = HashMap::new();
         let mut max: f64;
         let mut score = 0.0;
+        let mut prev_best_score = self.best_score;
         let mut temp_score: f64;
         let mut temp_new_distance = tail_length;
         let mut improvements = 0;
@@ -248,8 +249,7 @@ where
 
             head_length -= original_distance;
             if best_follow != *to {
-                improvements += 1;
-                changes += 2;
+                changes += 1;
                 temp_visited.insert(best_follow, true);
                 temp_visited.insert(*to, true);
                 new_best.push_node(best_follow);
@@ -261,6 +261,10 @@ where
                 tail_length += original_distance;
             }
             score += max;
+            if score > prev_best_score {
+                improvements += 1;
+                prev_best_score = score;
+            }
         }
 
         tx.send(Message::new(
