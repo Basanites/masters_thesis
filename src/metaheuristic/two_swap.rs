@@ -9,7 +9,6 @@ pub use supervisor::Supervisor;
 use crate::graph::GenericWeightedGraph;
 use crate::metaheuristic::{solution_length, Heuristic, Metaheuristic, ProblemInstance, Solution};
 
-use float_cmp::approx_eq;
 use num_traits::identities::Zero;
 use serde::Serialize;
 use std::cell::RefCell;
@@ -34,9 +33,9 @@ pub struct TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType: Serialize + De
     goal_point: IndexType,
     heuristic: &'a Heuristic<IndexType, NodeWeightType, EdgeWeightType>,
     max_time: EdgeWeightType,
-    best_solution: Solution<IndexType>,
-    best_score: f64,
-    best_length: EdgeWeightType,
+    pub best_solution: Solution<IndexType>,
+    pub best_score: f64,
+    pub best_length: EdgeWeightType,
     pub supervisor: Supervisor<W, EdgeWeightType>,
     i: usize,
 }
@@ -45,7 +44,7 @@ impl<'a, IndexType, NodeWeightType, EdgeWeightType, W>
     TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    NodeWeightType: Copy,
+    NodeWeightType: Copy + Debug,
     EdgeWeightType: Copy
         + Zero
         + Add<Output = EdgeWeightType>
@@ -165,32 +164,32 @@ where
         let mut temp_new_distance = tail_length;
         let mut improvements = 0;
         let mut changes = 0;
+        let g_borrowed = self.graph.borrow();
         for (from, to) in self.best_solution.iter_edges() {
-            let original_distance = *self.graph.borrow().edge_weight((*from, *to)).unwrap();
+            let original_distance = *g_borrowed.edge_weight((*from, *to)).unwrap();
             temp_visited.insert(*from, true);
-            let g_borrowed = self.graph.borrow();
             let t_weight = g_borrowed.node_weight(*to).unwrap();
             // if we already visited the node we can ignore it
             max = if temp_visited.contains_key(to) {
-                0.0
+                f64::zero()
             } else {
                 evals += 1;
                 self.score(*t_weight, original_distance, *to, tail_length)
             };
             let mut best_follow = *to;
 
-            for (nid, weight) in self.graph.borrow().iter_neighbors(*from).unwrap() {
+            for (nid, weight) in g_borrowed.iter_neighbors(*from).unwrap() {
                 // nodes that have been visited before don't have a value to us
                 temp_score = if temp_visited.contains_key(&nid) {
-                    0.0
+                    f64::zero()
                 } else {
                     evals += 1;
                     self.score_with_known_edge(nid, *weight, tail_length)
                 };
-                if let Ok(return_weight) = self.graph.borrow().edge_weight((nid, *to)) {
+                if let Ok(return_weight) = g_borrowed.edge_weight((nid, *to)) {
                     // only score this edge if the to node has not yet been visited
                     temp_score += if temp_visited.contains_key(to) {
-                        0.0
+                        f64::zero()
                     } else {
                         evals += 1;
                         self.score(*t_weight, *return_weight, *to, tail_length + *weight)
@@ -315,7 +314,7 @@ where
             tx.send(Message::new(
                 self.i,
                 0,
-                improvements,
+                0,
                 improvements,
                 1,
                 start_time.elapsed(),
@@ -338,7 +337,7 @@ impl<'a, IndexType, Nw, Ew, W> Metaheuristic<'a, IndexType, Nw, Ew>
     for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy,
+    Nw: Copy + Debug,
     Ew: Copy
         + Zero
         + Add<Output = Ew>
@@ -378,6 +377,11 @@ where
     }
 
     fn single_iteration(&mut self) -> Option<&Solution<IndexType>> {
+        // println!("iteration {}", self.i);
+        // println!("best solution {}", self.best_solution);
+        // for (edge, weight) in self.graph.borrow().iter_edges() {
+        //     println!("{:?} with weight {:?}", edge, weight);
+        // }
         let start_time = Instant::now();
         if self.expand(start_time) || self.contract(start_time) {
             Some(&self.best_solution)
@@ -395,6 +399,23 @@ where
             ))
             .unwrap();
             self.i += 1;
+
+            // let mut length = Ew::zero();
+            // let mut score = 0.0;
+            // let mut visited = HashMap::new();
+            // for (from, to) in self.best_solution.iter_edges() {
+            //     visited.insert(*from, true);
+            //     let ew = *self.graph.borrow().edge_weight((*from, *to)).unwrap();
+            //     length += ew;
+            //     if !visited.contains_key(to) {
+            //         score += self.score_with_known_edge(*to, ew, length);
+            //     }
+            //     visited.insert(*to, true);
+            // }
+            // println!(
+            //     "Solution: {}\n with length {:?}\n and score {}",
+            //     self.best_solution, length, score
+            // )
             None
         }
     }
@@ -403,7 +424,7 @@ where
 impl<'a, IndexType, Nw, Ew, W> Iterator for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy,
+    Nw: Copy + Debug,
     Ew: Copy
         + Zero
         + Add<Output = Ew>

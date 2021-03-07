@@ -131,7 +131,11 @@ mod tests {
         let edges: Vec<((usize, usize), &f64)> = graph.iter_edges().collect();
 
         assert_eq!(nodes.len(), 25, "A 5x5 grid graph should have 25 nodes.");
-        assert_eq!(edges.len(), 80, "A 5x5 grid graph should have 80 edges.");
+        assert_eq!(
+            edges.len(),
+            112,
+            "A 5x5 triangular grid graph should have 112 edges."
+        );
         for (_, weight) in edges.iter() {
             assert_eq!(
                 **weight, 2.0,
@@ -158,7 +162,11 @@ mod tests {
         let edges: Vec<((usize, usize), &f64)> = graph.iter_edges().collect();
 
         assert_eq!(nodes.len(), 25, "A 5x5 grid graph should have 25 nodes.");
-        assert_eq!(edges.len(), 80, "A 5x5 grid graph should have 80 edges.");
+        assert_eq!(
+            edges.len(),
+            112,
+            "A 5x5 triangular grid graph should have 112 edges."
+        );
     }
     #[test]
     fn random_weighted_same_rng_works() {
@@ -171,6 +179,10 @@ mod tests {
         let edges: Vec<((usize, usize), &f64)> = graph.iter_edges().collect();
 
         assert_eq!(nodes.len(), 25, "A 5x5 grid graph should have 25 nodes.");
-        assert_eq!(edges.len(), 80, "A 5x5 grid graph should have 80 edges.");
+        assert_eq!(
+            edges.len(),
+            112,
+            "A 5x5 triangular grid graph should have 112 edges."
+        );
     }
 }

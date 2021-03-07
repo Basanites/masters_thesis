@@ -100,8 +100,8 @@ impl DynamicGraphExperiment {
         let mut start_rng = rng64(experiment_cfg.seed as u128);
         let start_node = g_nodes[(start_rng.rand_float() * g_nodes.len() as f64) as usize];
         let graph_rc = RefCell::new(graph);
-        let dynamcis_cfg = config.graph_dynamics.cfg();
-        let mut dyn_rng = rng64(dynamcis_cfg.seed as u128);
+        let dynamics_cfg = config.graph_dynamics.cfg();
+        let mut dyn_rng = rng64(dynamics_cfg.seed as u128);
         let instance = ProblemInstance::new(&graph_rc, start_node, experiment_cfg.max_time);
         let fw = File::create(filename).unwrap();
 
@@ -120,7 +120,7 @@ impl DynamicGraphExperiment {
 
             let mut i = 0;
             while aco_algo.single_iteration().is_some() {
-                if i % dynamcis_cfg.change_after_i == 0 {
+                if i != 0 && (i % dynamics_cfg.change_after_i) == 0 {
                     change_graph(&graph_rc, &config.graph_dynamics, &mut dyn_rng);
                 }
                 i += 1;
@@ -134,7 +134,7 @@ impl DynamicGraphExperiment {
 
             let mut i = 0;
             while two_swap_algo.single_iteration().is_some() {
-                if i % dynamcis_cfg.change_after_i == 0 {
+                if i != 0 && (i % dynamics_cfg.change_after_i) == 0 {
                     change_graph(&graph_rc, &config.graph_dynamics, &mut dyn_rng);
                 }
                 i += 1;
