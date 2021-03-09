@@ -1,6 +1,7 @@
 use csv::Writer;
 use oorandom::Rand64;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::fs::File;
 use std::hash::Hash;
@@ -9,7 +10,7 @@ use crate::experiment_config::{ExperimentConfig, ExperimentConfigError, GraphDyn
 use crate::geo::GeoPoint;
 use crate::graph::generate::{ErdosRenyi, Generate, Grid};
 use crate::graph::import::{import_pbf, ImportError};
-use crate::graph::{GenericWeightedGraph, MatrixGraph};
+use crate::graph::{Edge, GenericWeightedGraph, MatrixGraph};
 use crate::metaheuristic::{
     aco, two_swap, Aco, Heuristic, Metaheuristic, ProblemInstance, TwoSwap,
 };
@@ -99,6 +100,14 @@ impl DynamicGraphExperiment {
         let g_nodes = graph.node_ids();
         let mut start_rng = rng64(experiment_cfg.seed as u128);
         let start_node = g_nodes[(start_rng.rand_float() * g_nodes.len() as f64) as usize];
+        let o_nodes: HashMap<IndexType, f64> = graph
+            .iter_nodes()
+            .map(|(id, weight)| (id, *weight))
+            .collect();
+        let o_edges: HashMap<Edge<IndexType>, f64> = graph
+            .iter_edges()
+            .map(|(id, weight)| (id, *weight))
+            .collect();
         let graph_rc = RefCell::new(graph);
         let dynamics_cfg = config.graph_dynamics.cfg();
         let mut dyn_rng = rng64(dynamics_cfg.seed as u128);
@@ -120,8 +129,14 @@ impl DynamicGraphExperiment {
 
             let mut i = 0;
             while aco_algo.single_iteration().is_some() {
-                if i != 0 && (i % dynamics_cfg.change_after_i) == 0 {
-                    change_graph(&graph_rc, &config.graph_dynamics, &mut dyn_rng);
+                if (i + 1) % dynamics_cfg.change_after_i == 0 {
+                    change_graph(
+                        &graph_rc,
+                        &config.graph_dynamics,
+                        &mut dyn_rng,
+                        &o_nodes,
+                        &o_edges,
+                    );
                 }
                 i += 1;
             }
@@ -134,8 +149,14 @@ impl DynamicGraphExperiment {
 
             let mut i = 0;
             while two_swap_algo.single_iteration().is_some() {
-                if i != 0 && (i % dynamics_cfg.change_after_i) == 0 {
-                    change_graph(&graph_rc, &config.graph_dynamics, &mut dyn_rng);
+                if (i + 1) % dynamics_cfg.change_after_i == 0 {
+                    change_graph(
+                        &graph_rc,
+                        &config.graph_dynamics,
+                        &mut dyn_rng,
+                        &o_nodes,
+                        &o_edges,
+                    );
                 }
                 i += 1;
             }
@@ -154,13 +175,15 @@ fn change_graph<IndexType: 'static + Clone + Hash + Copy + Eq + Debug + Display>
     graph: &RefCell<MatrixGraph<IndexType, f64, f64>>,
     dynamics_cfg: &GraphDynamicsConfig,
     rng: &mut Rand64,
+    original_node_weights: &HashMap<IndexType, f64>,
+    original_edge_weights: &HashMap<Edge<IndexType>, f64>,
 ) {
-    let cfg = dynamics_cfg.cfg();
+    let dynamics_cfg = dynamics_cfg.cfg();
 
     // determine which nodes will be changed
     let mut change_nodes = Vec::new();
     for nid in graph.borrow().iter_node_ids() {
-        if rng.rand_float() > cfg.node_change_probability {
+        if rng.rand_float() > dynamics_cfg.node_change_probability {
             change_nodes.push(nid);
         }
     }
@@ -168,7 +191,7 @@ fn change_graph<IndexType: 'static + Clone + Hash + Copy + Eq + Debug + Display>
     // determine which edges will be changed
     let mut change_edges = Vec::new();
     for eid in graph.borrow().iter_edge_ids() {
-        if rng.rand_float() > cfg.edge_change_probability {
+        if rng.rand_float() > dynamics_cfg.edge_change_probability {
             change_edges.push(eid);
         }
     }
@@ -176,23 +199,17 @@ fn change_graph<IndexType: 'static + Clone + Hash + Copy + Eq + Debug + Display>
     let mut mut_graph = graph.borrow_mut();
     // change nodes
     for nid in change_nodes {
-        let mut val = *mut_graph.node_weight(nid).unwrap();
-        val = val * (rng.rand_float() * 2.0 - 1.0) * cfg.node_change_intensity;
-        if val < 0.0 {
-            val = 0.0;
+        if let Some(val) = original_node_weights.get(&nid) {
+            let new_val = val * rng.rand_float() * dynamics_cfg.node_change_intensity;
+            mut_graph.change_node(nid, new_val);
         }
-
-        mut_graph.change_node(nid, val);
     }
 
     // change edges
     for eid in change_edges {
-        let mut val = *mut_graph.edge_weight(eid).unwrap();
-        val = val * (rng.rand_float() * 2.0 - 1.0) * cfg.edge_change_intensity;
-        if val < 0.0 {
-            val = 0.0;
+        if let Some(val) = original_edge_weights.get(&eid) {
+            let new_val = val * rng.rand_float() * dynamics_cfg.edge_change_intensity;
+            mut_graph.change_edge(eid, val + new_val).unwrap();
         }
-
-        mut_graph.change_edge(eid, val).unwrap();
     }
 }
