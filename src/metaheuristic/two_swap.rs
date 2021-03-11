@@ -20,9 +20,15 @@ use std::hash::Hash;
 use std::io::Write;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Sub, SubAssign};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-pub struct TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType: Serialize + Default, W: Write> {
+pub struct TwoSwap<
+    'a,
+    IndexType,
+    NodeWeightType: Serialize + Default,
+    EdgeWeightType: Serialize + Default,
+    W: Write,
+> {
     graph: &'a RefCell<
         dyn GenericWeightedGraph<
             IndexType = IndexType,
@@ -36,7 +42,7 @@ pub struct TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType: Serialize + De
     pub best_solution: Solution<IndexType>,
     pub best_score: f64,
     pub best_length: EdgeWeightType,
-    pub supervisor: Supervisor<W, EdgeWeightType>,
+    pub supervisor: Supervisor<W, NodeWeightType, EdgeWeightType>,
     i: usize,
 }
 
@@ -44,7 +50,13 @@ impl<'a, IndexType, NodeWeightType, EdgeWeightType, W>
     TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    NodeWeightType: Copy + Debug,
+    NodeWeightType: Copy
+        + Debug
+        + Add<Output = NodeWeightType>
+        + Serialize
+        + Default
+        + Zero
+        + AddAssign<NodeWeightType>,
     EdgeWeightType: Copy
         + Zero
         + Add<Output = EdgeWeightType>
@@ -97,8 +109,49 @@ where
         )
     }
 
-    pub fn initialize(&mut self) {
+    fn send_message(
+        &self,
+        iteration: usize,
+        evaluations: usize,
+        n_improvements: usize,
+        changes: usize,
+        phase: usize,
+        cpu_time: Duration,
+        distance: EdgeWeightType,
+        heuristic_score: f64,
+        solution: &Solution<IndexType>,
+    ) {
         let tx = self.supervisor.sender();
+
+        let g_borrow = self.graph.borrow();
+        let mut visited_nodes = 0;
+        let mut val_sum = NodeWeightType::zero();
+        let mut visited_with_val = 0;
+        for node in solution.iter_unique_nodes() {
+            visited_nodes += 1;
+            if let Ok(weight) = g_borrow.node_weight(node) {
+                val_sum += *weight;
+                visited_with_val += 1;
+            }
+        }
+
+        tx.send(Message::new(
+            iteration,
+            evaluations,
+            n_improvements,
+            changes,
+            phase,
+            cpu_time,
+            distance,
+            heuristic_score,
+            visited_nodes,
+            visited_with_val,
+            val_sum,
+        ))
+        .unwrap();
+    }
+
+    pub fn initialize(&mut self) {
         let start_time = Instant::now();
         let mut evals = 0;
         // we take the node with best score we can also get back from
@@ -127,7 +180,7 @@ where
             self.best_length = solution_length(&self.best_solution, self.graph).unwrap();
         }
 
-        tx.send(Message::new(
+        self.send_message(
             self.i,
             evals,
             0,
@@ -136,8 +189,8 @@ where
             start_time.elapsed(),
             self.best_length,
             self.best_score,
-        ))
-        .unwrap();
+            &self.best_solution,
+        );
         self.i += 1;
     }
 
@@ -151,7 +204,6 @@ where
     }
 
     pub fn expand(&mut self, start_time: Instant) -> bool {
-        let tx = self.supervisor.sender();
         let mut evals = 0;
         let mut new_best = Solution::from_nodes(vec![self.goal_point]);
         let mut head_length = self.best_length; // initialized to the 0 of Ew
@@ -225,7 +277,7 @@ where
         }
 
         if score > self.best_score {
-            tx.send(Message::new(
+            self.send_message(
                 self.i,
                 evals,
                 improvements,
@@ -234,8 +286,9 @@ where
                 start_time.elapsed(),
                 tail_length,
                 score,
-            ))
-            .unwrap();
+                &new_best,
+            );
+
             self.i += 1;
             self.best_solution = new_best;
             self.best_score = score;
@@ -248,7 +301,6 @@ where
     }
 
     pub fn contract(&mut self, start_time: Instant) -> bool {
-        let tx = self.supervisor.sender();
         let mut temp_visited = HashMap::new();
         let mut length = EdgeWeightType::zero();
         let mut improvements = 0;
@@ -311,7 +363,7 @@ where
         }
 
         if improvements != 0 {
-            tx.send(Message::new(
+            self.send_message(
                 self.i,
                 0,
                 0,
@@ -320,8 +372,9 @@ where
                 start_time.elapsed(),
                 length,
                 self.best_score,
-            ))
-            .unwrap();
+                &new_solution,
+            );
+
             self.i += 1;
             self.best_solution = new_solution;
             self.best_length = length;
@@ -337,7 +390,7 @@ impl<'a, IndexType, Nw, Ew, W> Metaheuristic<'a, IndexType, Nw, Ew>
     for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Debug,
+    Nw: Copy + Debug + Add<Output = Nw> + Serialize + Default + Zero + AddAssign<Nw>,
     Ew: Copy
         + Zero
         + Add<Output = Ew>
@@ -353,7 +406,7 @@ where
     W: Write,
 {
     type Params = Params<'a, IndexType, Nw, Ew>;
-    type SupervisorType = Supervisor<W, Ew>;
+    type SupervisorType = Supervisor<W, Nw, Ew>;
 
     fn new(
         problem: ProblemInstance<'a, IndexType, Nw, Ew>,
@@ -386,8 +439,7 @@ where
         if self.expand(start_time) || self.contract(start_time) {
             Some(&self.best_solution)
         } else {
-            let tx = self.supervisor.sender();
-            tx.send(Message::new(
+            self.send_message(
                 self.i,
                 0,
                 0,
@@ -396,26 +448,10 @@ where
                 start_time.elapsed(),
                 self.best_length,
                 self.best_score,
-            ))
-            .unwrap();
+                &self.best_solution,
+            );
             self.i += 1;
 
-            // let mut length = Ew::zero();
-            // let mut score = 0.0;
-            // let mut visited = HashMap::new();
-            // for (from, to) in self.best_solution.iter_edges() {
-            //     visited.insert(*from, true);
-            //     let ew = *self.graph.borrow().edge_weight((*from, *to)).unwrap();
-            //     length += ew;
-            //     if !visited.contains_key(to) {
-            //         score += self.score_with_known_edge(*to, ew, length);
-            //     }
-            //     visited.insert(*to, true);
-            // }
-            // println!(
-            //     "Solution: {}\n with length {:?}\n and score {}",
-            //     self.best_solution, length, score
-            // )
             None
         }
     }
@@ -424,7 +460,7 @@ where
 impl<'a, IndexType, Nw, Ew, W> Iterator for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Debug,
+    Nw: Copy + Debug + Add<Output = Nw> + Serialize + Default + Zero + AddAssign<Nw>,
     Ew: Copy
         + Zero
         + Add<Output = Ew>

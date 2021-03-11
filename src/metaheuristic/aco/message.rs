@@ -4,19 +4,22 @@ use crate::metaheuristic::supervisor::MessageInfo;
 use std::time::Duration;
 
 #[derive(Debug)]
-pub struct Message<Ew> {
-    ant_id: usize,
-    iteration: usize,
-    evaluations: usize,
-    n_improvements: usize,
-    changes: usize,
-    phase: usize,
-    cpu_time: Duration,
-    distance: Ew,
-    score: f64,
+pub struct Message<Nw, Ew> {
+    pub ant_id: usize,
+    pub iteration: usize,
+    pub evaluations: usize,
+    pub cpu_time: Duration,
+    pub n_improvements: usize,
+    pub changes: usize,
+    pub phase: usize,
+    pub distance: Ew,
+    pub heuristic_score: f64,
+    pub visited_nodes: usize,
+    pub visited_nodes_with_val: usize,
+    pub collected_val: Nw,
 }
 
-impl<Ew> Message<Ew> {
+impl<Nw, Ew> Message<Nw, Ew> {
     pub fn new(
         ant_id: usize,
         iteration: usize,
@@ -26,7 +29,10 @@ impl<Ew> Message<Ew> {
         phase: usize,
         cpu_time: Duration,
         distance: Ew,
-        score: f64,
+        heuristic_score: f64,
+        visited_nodes: usize,
+        visited_nodes_with_val: usize,
+        collected_val: Nw,
     ) -> Self {
         Self {
             ant_id,
@@ -37,11 +43,14 @@ impl<Ew> Message<Ew> {
             phase,
             cpu_time,
             distance,
-            score,
+            heuristic_score,
+            visited_nodes,
+            visited_nodes_with_val,
+            collected_val,
         }
     }
 
-    pub fn from_info(ant_id: usize, iteration: usize, info: MessageInfo<Ew>) -> Self {
+    pub fn from_info(ant_id: usize, iteration: usize, info: MessageInfo<Nw, Ew>) -> Self {
         Self {
             ant_id,
             iteration,
@@ -51,7 +60,10 @@ impl<Ew> Message<Ew> {
             phase: info.phase,
             cpu_time: info.cpu_time,
             distance: info.distance,
-            score: info.score,
+            heuristic_score: info.heuristic_score,
+            visited_nodes: info.visited_nodes,
+            visited_nodes_with_val: info.visited_nodes_with_val,
+            collected_val: info.collected_val,
         }
     }
 
@@ -60,10 +72,11 @@ impl<Ew> Message<Ew> {
     }
 }
 
-impl<Ew: Copy> supervisor::Message for Message<Ew> {
+impl<Nw: Copy, Ew: Copy> supervisor::Message for Message<Nw, Ew> {
     type EwType = Ew;
+    type NwType = Nw;
 
-    fn get_info(&self) -> MessageInfo<Ew> {
+    fn get_info(&self) -> MessageInfo<Nw, Ew> {
         MessageInfo::new(
             self.evaluations,
             self.n_improvements,
@@ -71,7 +84,10 @@ impl<Ew: Copy> supervisor::Message for Message<Ew> {
             self.phase,
             self.cpu_time,
             self.distance,
-            self.score,
+            self.heuristic_score,
+            self.visited_nodes,
+            self.visited_nodes_with_val,
+            self.collected_val,
         )
     }
 }

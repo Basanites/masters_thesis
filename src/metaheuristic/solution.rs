@@ -2,8 +2,11 @@ use crate::graph::{Edge, GenericWeightedGraph, GraphError};
 
 use num_traits::identities::Zero;
 use std::cell::RefCell;
+use std::cmp::Eq;
+use std::collections::HashSet;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::hash::Hash;
 use std::iter::Sum;
 
 pub fn solution_length<IndexType, NodeWeightType, EdgeWeightType>(
@@ -17,7 +20,7 @@ pub fn solution_length<IndexType, NodeWeightType, EdgeWeightType>(
     >,
 ) -> Result<EdgeWeightType, GraphError<IndexType>>
 where
-    IndexType: PartialEq + Copy + Debug + Display,
+    IndexType: PartialEq + Copy + Debug + Display + Hash + Eq,
     EdgeWeightType: Sum + Copy,
 {
     for (from, to) in solution.iter_edges() {
@@ -39,7 +42,7 @@ pub fn solution_score<IndexType, Nw, Ew>(
     >,
 ) -> Result<Nw, GraphError<IndexType>>
 where
-    IndexType: PartialEq + Copy + Debug + Display,
+    IndexType: PartialEq + Copy + Debug + Display + Hash + Eq,
     Nw: Sum + Copy,
 {
     for id in solution.iter_nodes() {
@@ -61,7 +64,7 @@ pub fn solution_score_and_length<IndexType, Nw, Ew>(
     >,
 ) -> Result<(Nw, Ew), GraphError<IndexType>>
 where
-    IndexType: PartialEq + Copy + Debug + Display,
+    IndexType: PartialEq + Copy + Debug + Display + Hash + Eq,
     Nw: Copy + Zero,
     Ew: Copy + Zero,
 {
@@ -99,7 +102,7 @@ pub struct Solution<IndexType> {
 
 impl<IndexType> Default for Solution<IndexType>
 where
-    IndexType: PartialEq + Copy,
+    IndexType: PartialEq + Copy + Hash + Eq,
 {
     fn default() -> Self {
         Solution::new()
@@ -108,7 +111,7 @@ where
 
 impl<IndexType> Solution<IndexType>
 where
-    IndexType: PartialEq + Copy,
+    IndexType: PartialEq + Copy + Hash + Eq,
 {
     pub fn new() -> Self {
         Solution {
@@ -166,6 +169,19 @@ where
 
     pub fn nodes(&self) -> Vec<IndexType> {
         self.node_list.clone()
+    }
+
+    pub fn iter_unique_nodes(&self) -> Box<dyn Iterator<Item = IndexType> + '_> {
+        let mut visited = HashSet::new();
+        for node in self.node_list.iter() {
+            visited.insert(*node);
+        }
+
+        Box::new(visited.into_iter())
+    }
+
+    pub fn unique_nodes(&self) -> Vec<IndexType> {
+        self.iter_unique_nodes().collect()
     }
 }
 

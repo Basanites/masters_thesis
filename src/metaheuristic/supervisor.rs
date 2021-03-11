@@ -6,21 +6,25 @@ pub trait Supervisor<MessageType: Message> {}
 
 pub trait Message {
     type EwType;
-    fn get_info(&self) -> MessageInfo<Self::EwType>;
+    type NwType;
+    fn get_info(&self) -> MessageInfo<Self::NwType, Self::EwType>;
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
-pub struct MessageInfo<Ew> {
+pub struct MessageInfo<Nw, Ew> {
     pub evaluations: usize,
     pub cpu_time: Duration,
     pub n_improvements: usize,
     pub changes: usize,
     pub phase: usize,
     pub distance: Ew,
-    pub score: f64,
+    pub heuristic_score: f64,
+    pub visited_nodes: usize,
+    pub visited_nodes_with_val: usize,
+    pub collected_val: Nw,
 }
 
-impl<Ew> MessageInfo<Ew> {
+impl<Nw, Ew> MessageInfo<Nw, Ew> {
     pub fn new(
         evaluations: usize,
         n_improvements: usize,
@@ -28,7 +32,10 @@ impl<Ew> MessageInfo<Ew> {
         phase: usize,
         cpu_time: Duration,
         distance: Ew,
-        score: f64,
+        heuristic_score: f64,
+        visited_nodes: usize,
+        visited_nodes_with_val: usize,
+        collected_val: Nw,
     ) -> Self {
         Self {
             evaluations,
@@ -37,12 +44,15 @@ impl<Ew> MessageInfo<Ew> {
             phase,
             cpu_time,
             distance,
-            score,
+            heuristic_score,
+            visited_nodes,
+            visited_nodes_with_val,
+            collected_val,
         }
     }
 }
 
-impl<Ew: Add<Output = Ew>> Add for MessageInfo<Ew> {
+impl<Nw: Add<Output = Nw>, Ew: Add<Output = Ew>> Add for MessageInfo<Nw, Ew> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -53,12 +63,15 @@ impl<Ew: Add<Output = Ew>> Add for MessageInfo<Ew> {
             phase: other.phase,
             cpu_time: self.cpu_time + other.cpu_time,
             distance: self.distance + other.distance,
-            score: self.score + other.score,
+            heuristic_score: self.heuristic_score + other.heuristic_score,
+            visited_nodes: self.visited_nodes + other.visited_nodes,
+            visited_nodes_with_val: self.visited_nodes_with_val + other.visited_nodes_with_val,
+            collected_val: self.collected_val + other.collected_val,
         }
     }
 }
 
-impl<Ew: Add<Output = Ew> + Copy> AddAssign for MessageInfo<Ew> {
+impl<Nw: Copy + Add<Output = Nw>, Ew: Copy + Add<Output = Ew>> AddAssign for MessageInfo<Nw, Ew> {
     fn add_assign(&mut self, other: Self) {
         *self = Self {
             evaluations: self.evaluations + other.evaluations,
@@ -67,7 +80,10 @@ impl<Ew: Add<Output = Ew> + Copy> AddAssign for MessageInfo<Ew> {
             phase: other.phase,
             cpu_time: self.cpu_time + other.cpu_time,
             distance: self.distance + other.distance,
-            score: self.score + other.score,
+            heuristic_score: self.heuristic_score + other.heuristic_score,
+            visited_nodes: self.visited_nodes + other.visited_nodes,
+            visited_nodes_with_val: self.visited_nodes_with_val + other.visited_nodes_with_val,
+            collected_val: self.collected_val + other.collected_val,
         };
     }
 }

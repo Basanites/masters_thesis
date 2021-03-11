@@ -11,17 +11,18 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
-pub struct Supervisor<W: Write, Ew: Serialize + Sized> {
-    sender: Sender<two_swap::Message<Ew>>,
-    receiver: Receiver<two_swap::Message<Ew>>,
-    messages: Vec<MessageInfo<Ew>>,
+pub struct Supervisor<W: Write, Nw: Serialize + Sized, Ew: Serialize + Sized> {
+    sender: Sender<two_swap::Message<Nw, Ew>>,
+    receiver: Receiver<two_swap::Message<Nw, Ew>>,
+    messages: Vec<MessageInfo<Nw, Ew>>,
     writer: Writer<W>,
     aggregation_rate: usize,
 }
 
-impl<W, Ew> Supervisor<W, Ew>
+impl<W, Nw, Ew> Supervisor<W, Nw, Ew>
 where
     W: Write,
+    Nw: Serialize + Default + Add<Output = Nw> + Copy,
     Ew: Serialize + Default + Add<Output = Ew> + Copy,
 {
     pub fn new(aggregation_rate: usize, writer: Writer<W>) -> Self {
@@ -35,7 +36,7 @@ where
         }
     }
 
-    pub fn sender(&self) -> Sender<two_swap::Message<Ew>> {
+    pub fn sender(&self) -> Sender<two_swap::Message<Nw, Ew>> {
         self.sender.clone()
     }
 
@@ -58,7 +59,10 @@ where
                 msg_info.phase,
                 msg_info.cpu_time,
                 msg_info.distance,
-                msg_info.score,
+                msg_info.heuristic_score,
+                msg_info.visited_nodes,
+                msg_info.visited_nodes_with_val,
+                msg_info.collected_val,
             );
             let res = self.writer.serialize(record);
             if let Err(err) = res {
@@ -68,15 +72,18 @@ where
     }
 }
 
-impl<W, Ew: Copy> supervisor::Supervisor<two_swap::Message<Ew>> for Supervisor<W, Ew>
+impl<W, Nw: Copy, Ew: Copy> supervisor::Supervisor<two_swap::Message<Nw, Ew>>
+    for Supervisor<W, Nw, Ew>
 where
     W: Write,
+    Nw: Serialize + Default + Add<Output = Nw>,
     Ew: Serialize + Default + Add<Output = Ew>,
 {
 }
 
-impl<Ew> Default for Supervisor<Stderr, Ew>
+impl<Nw, Ew> Default for Supervisor<Stderr, Nw, Ew>
 where
+    Nw: Serialize + Default + Add<Output = Nw>,
     Ew: Serialize + Default + Add<Output = Ew>,
 {
     fn default() -> Self {

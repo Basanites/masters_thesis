@@ -5,7 +5,7 @@ use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::time::Duration;
 
 #[derive(Debug)]
-pub struct Message<Ew> {
+pub struct Message<Nw, Ew> {
     pub iteration: usize,
     pub evaluations: usize,
     pub n_improvements: usize,
@@ -13,10 +13,13 @@ pub struct Message<Ew> {
     pub phase: usize,
     pub cpu_time: Duration,
     pub distance: Ew,
-    pub score: f64,
+    pub heuristic_score: f64,
+    pub visited_nodes: usize,
+    pub visited_nodes_with_val: usize,
+    pub collected_val: Nw,
 }
 
-impl<Ew> Message<Ew> {
+impl<Nw, Ew> Message<Nw, Ew> {
     pub fn new(
         iteration: usize,
         evaluations: usize,
@@ -25,7 +28,10 @@ impl<Ew> Message<Ew> {
         phase: usize,
         cpu_time: Duration,
         distance: Ew,
-        score: f64,
+        heuristic_score: f64,
+        visited_nodes: usize,
+        visited_nodes_with_val: usize,
+        collected_val: Nw,
     ) -> Self {
         Self {
             iteration,
@@ -35,11 +41,14 @@ impl<Ew> Message<Ew> {
             phase,
             cpu_time,
             distance,
-            score,
+            heuristic_score,
+            visited_nodes,
+            visited_nodes_with_val,
+            collected_val,
         }
     }
 
-    pub fn from_info(iteration: usize, info: MessageInfo<Ew>) -> Self {
+    pub fn from_info(iteration: usize, info: MessageInfo<Nw, Ew>) -> Self {
         Self {
             iteration,
             evaluations: info.evaluations,
@@ -48,14 +57,18 @@ impl<Ew> Message<Ew> {
             phase: info.phase,
             cpu_time: info.cpu_time,
             distance: info.distance,
-            score: info.score,
+            heuristic_score: info.heuristic_score,
+            visited_nodes: info.visited_nodes,
+            visited_nodes_with_val: info.visited_nodes_with_val,
+            collected_val: info.collected_val,
         }
     }
 }
 
-impl<Ew: Copy> supervisor::Message for Message<Ew> {
+impl<Nw: Copy, Ew: Copy> supervisor::Message for Message<Nw, Ew> {
     type EwType = Ew;
-    fn get_info(&self) -> MessageInfo<Ew> {
+    type NwType = Nw;
+    fn get_info(&self) -> MessageInfo<Nw, Ew> {
         MessageInfo::new(
             self.evaluations,
             self.n_improvements,
@@ -63,12 +76,15 @@ impl<Ew: Copy> supervisor::Message for Message<Ew> {
             self.phase,
             self.cpu_time,
             self.distance,
-            self.score,
+            self.heuristic_score,
+            self.visited_nodes,
+            self.visited_nodes_with_val,
+            self.collected_val,
         )
     }
 }
 
-impl<Ew: Serialize> Serialize for Message<Ew> {
+impl<Nw: Serialize, Ew: Serialize> Serialize for Message<Nw, Ew> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -81,8 +97,11 @@ impl<Ew: Serialize> Serialize for Message<Ew> {
         state.serialize_field("changes", &self.changes)?;
         state.serialize_field("phase", &self.phase)?;
         state.serialize_field("cpu_time_mus", &self.cpu_time.as_micros())?;
-        state.serialize_field("time", &self.distance)?;
-        state.serialize_field("value", &self.score)?;
+        state.serialize_field("distance", &self.distance)?;
+        state.serialize_field("heuristic_score", &self.heuristic_score)?;
+        state.serialize_field("visited_nodes", &self.visited_nodes)?;
+        state.serialize_field("visited_nodes_with_val", &self.visited_nodes_with_val)?;
+        state.serialize_field("collected_val", &self.collected_val)?;
         state.end()
     }
 }

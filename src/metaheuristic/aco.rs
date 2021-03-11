@@ -29,6 +29,7 @@ pub struct Aco<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Clone,
     W: Write,
+    Nw: Serialize + Add<Output = Nw>,
     Ew: Serialize + Add<Output = Ew>,
 {
     graph: &'a RefCell<
@@ -46,14 +47,14 @@ where
     best_solution: Solution<IndexType>,
     best_score: Nw,
     best_length: Ew,
-    pub supervisor: Supervisor<W, Ew>,
+    pub supervisor: Supervisor<W, Nw, Ew>,
     rng: Rand64,
 }
 
 impl<'a, IndexType, Nw, W> Aco<'a, IndexType, Nw, f64, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Zero + PartialOrd,
+    Nw: Copy + Zero + PartialOrd + Serialize,
     W: Write,
 {
     fn pheromone_update(&mut self, solution: &Solution<IndexType>, solution_length: f64) {
@@ -81,7 +82,7 @@ where
     W: Write,
 {
     type Params = Params<'a, IndexType, f64, f64>;
-    type SupervisorType = Supervisor<W, f64>;
+    type SupervisorType = Supervisor<W, f64, f64>;
 
     fn new(
         problem: ProblemInstance<'a, IndexType, f64, f64>,
@@ -161,6 +162,18 @@ where
             }
         }
 
+        let g_borrow = self.graph.borrow();
+        let mut visited_nodes = 0;
+        let mut nodes_with_val = 0;
+        let mut val_sum = 0.0;
+        for node in best_solution.iter_nodes() {
+            visited_nodes += 1;
+            if let Ok(weight) = g_borrow.node_weight(*node) {
+                nodes_with_val += 1;
+                val_sum += *weight;
+            }
+        }
+
         let duration = start_time.elapsed();
         let _ = self.supervisor.sender.send(Message::new(
             0,
@@ -172,6 +185,9 @@ where
             duration,
             best_length,
             best_score,
+            visited_nodes,
+            nodes_with_val,
+            val_sum,
         )); // Ant 0 is always supervisor
         self.supervisor.aggregate_receive();
         self.supervisor.reset();

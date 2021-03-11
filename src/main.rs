@@ -1,4 +1,4 @@
-#![feature(test, min_specialization)]
+#![feature(test, min_specialization, map_into_keys_values)]
 #![allow(dead_code)]
 mod dynamic_graph_experiment;
 mod experiment_config;

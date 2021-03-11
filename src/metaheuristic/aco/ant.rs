@@ -11,6 +11,7 @@ use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::ops::AddAssign;
 use std::sync::mpsc::Sender;
 use std::time::Instant;
 
@@ -29,14 +30,14 @@ where
     beta: f64,
     rng_seed: u128,
     heuristic: &'a Heuristic<IndexType, Nw, Ew>,
-    sender: Sender<Message<Ew>>,
+    sender: Sender<Message<Nw, Ew>>,
     id: usize,
 }
 
 impl<'a, IndexType, Nw> Ant<'a, IndexType, Nw, f64>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Zero,
+    Nw: Copy + Zero + AddAssign<Nw>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -54,7 +55,7 @@ where
         rng_seed: u128,
         alpha: f64,
         beta: f64,
-        sender: Sender<Message<f64>>,
+        sender: Sender<Message<Nw, f64>>,
         id: usize,
     ) -> Self {
         Ant {
@@ -173,6 +174,18 @@ where
             }
         }
 
+        let g_borrow = self.graph.borrow();
+        let mut visited_nodes = 0;
+        let mut nodes_with_val = 0;
+        let mut val_sum = Nw::zero();
+        for node in solution.iter_nodes() {
+            visited_nodes += 1;
+            if let Ok(weight) = g_borrow.node_weight(*node) {
+                nodes_with_val += 1;
+                val_sum += *weight;
+            }
+        }
+
         // TODO: log errors from sending here
         let _res = self.sender.send(Message::new(
             self.id,
@@ -184,6 +197,9 @@ where
             start_time.elapsed(),
             tail_length,
             score,
+            visited_nodes,
+            nodes_with_val,
+            val_sum,
         ));
         solution
     }

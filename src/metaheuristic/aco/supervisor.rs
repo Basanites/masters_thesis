@@ -10,19 +10,20 @@ use std::ops::Add;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
-pub struct Supervisor<W: Write, Ew: Serialize + Sized> {
-    pub sender: Sender<aco::Message<Ew>>,
-    receiver: Receiver<aco::Message<Ew>>,
+pub struct Supervisor<W: Write, Nw: Serialize + Sized, Ew: Serialize + Sized> {
+    pub sender: Sender<aco::Message<Nw, Ew>>,
+    receiver: Receiver<aco::Message<Nw, Ew>>,
     ants: usize,
-    messages: HashMap<usize, Vec<MessageInfo<Ew>>>,
+    messages: HashMap<usize, Vec<MessageInfo<Nw, Ew>>>,
     counters: HashMap<usize, usize>,
     aggregation_rate: usize,
     writer: Writer<W>,
 }
 
-impl<W, Ew> Supervisor<W, Ew>
+impl<W, Nw, Ew> Supervisor<W, Nw, Ew>
 where
     W: Write,
+    Nw: Serialize + Default + Add<Output = Nw> + Copy,
     Ew: Serialize + Default + Add<Output = Ew> + Copy,
 {
     pub fn new(aggregation_rate: usize, writer: Writer<W>) -> Self {
@@ -38,7 +39,7 @@ where
         }
     }
 
-    pub fn new_ant(&mut self) -> (Sender<aco::Message<Ew>>, usize) {
+    pub fn new_ant(&mut self) -> (Sender<aco::Message<Nw, Ew>>, usize) {
         self.ants += 1;
         let id = self.ants;
 
@@ -76,15 +77,17 @@ where
     }
 }
 
-impl<W, Ew: Copy> supervisor::Supervisor<aco::Message<Ew>> for Supervisor<W, Ew>
+impl<W, Nw: Copy, Ew: Copy> supervisor::Supervisor<aco::Message<Nw, Ew>> for Supervisor<W, Nw, Ew>
 where
     W: Write,
+    Nw: Serialize + Default + Add<Output = Nw>,
     Ew: Serialize + Default + Add<Output = Ew>,
 {
 }
 
-impl<Ew> Default for Supervisor<Stderr, Ew>
+impl<Nw, Ew> Default for Supervisor<Stderr, Nw, Ew>
 where
+    Nw: Serialize + Default + Add<Output = Nw>,
     Ew: Serialize + Default + Add<Output = Ew>,
 {
     fn default() -> Self {
