@@ -129,7 +129,7 @@ impl DynamicGraphExperiment {
 
             let mut i = 0;
             while aco_algo.single_iteration().is_some() {
-                if (i + 1) % dynamics_cfg.change_after_i == 0 {
+                if i % dynamics_cfg.change_after_i == 0 {
                     change_graph(
                         &graph_rc,
                         &config.graph_dynamics,
@@ -149,7 +149,7 @@ impl DynamicGraphExperiment {
 
             let mut i = 0;
             while two_swap_algo.single_iteration().is_some() {
-                if (i + 1) % dynamics_cfg.change_after_i == 0 {
+                if i % dynamics_cfg.change_after_i == 0 {
                     change_graph(
                         &graph_rc,
                         &config.graph_dynamics,
