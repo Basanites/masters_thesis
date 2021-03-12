@@ -92,13 +92,7 @@ where
         let graph = problem.graph.borrow();
         let pheromones = MatrixGraph::new(
             graph.iter_node_ids().map(|id| (id, ())).collect(),
-            graph
-                .iter_node_ids()
-                .map(|x| -> Vec<(Edge<IndexType>, f64)> {
-                    graph.iter_node_ids().map(|y| ((x, y), 1.0)).collect()
-                })
-                .flatten()
-                .collect(),
+            graph.iter_edge_ids().map(|edge| (edge, 1.0)).collect(),
         )
         .unwrap();
 
@@ -145,6 +139,7 @@ where
         for ant in ants {
             solutions.push(ant.get_solution())
         }
+        println!("iteration done");
 
         let start_time = Instant::now();
         let mut best_length = f64::zero();

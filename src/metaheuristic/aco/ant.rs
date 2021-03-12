@@ -124,6 +124,7 @@ where
         let mut goal_reached = false;
         let mut visited: HashMap<IndexType, bool> = HashMap::new();
         while !goal_reached {
+            println!("{}", solution);
             // calculate the sums of the weighted heuristic and pheromones for all neighbors of next_node
             let weighted_pheromone_sum = self
                 .pheromone_matrix

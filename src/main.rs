@@ -29,12 +29,23 @@ fn two_swap_h2<IndexType>(nw: f64, ew: f64, _id: IndexType, _elapsed: f64) -> f6
     nw / ew
 }
 
+fn aco_h1<IndexType>(nw: f64, _ew: f64, _id: IndexType, _elapsed: f64) -> f64 {
+    nw
+}
+
+fn aco_h2<IndexType>(nw: f64, ew: f64, _id: IndexType, _elapsed: f64) -> f64 {
+    nw / ew
+}
+
 fn main() {
     let experiment_location = "./experiments";
     let two_swap_functions_usize: Vec<(&UsizeHeuristic, &str)> =
         vec![(&two_swap_h1, "h1"), (&two_swap_h2, "h2")];
     let two_swap_functions_geo: Vec<(&GeoPointHeuristic, &str)> =
         vec![(&two_swap_h1, "h1"), (&two_swap_h2, "h2")];
+
+    let aco_functions_usize: Vec<(&UsizeHeuristic, &str)> = vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
+    let aco_functions_geo: Vec<(&GeoPointHeuristic, &str)> = vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
 
     for entry in glob(format!("{}/*.yaml", experiment_location).as_str())
         .expect("Failed to read glob pattern")
@@ -118,6 +129,32 @@ fn main() {
                 }
             } else {
                 for (heuristic, name) in two_swap_functions_usize.iter() {
+                    let filename = format!("{}/{}.csv", log_folder.to_str().unwrap(), name);
+                    let res = DynamicGraphExperiment::run_usize_config(
+                        &experiment,
+                        heuristic,
+                        filename.as_str(),
+                    );
+                    if let Err(e) = res {
+                        eprintln!("{}", e);
+                    }
+                }
+            }
+        } else if experiment.algorithm.aco().is_ok() {
+            if experiment.graph_creation.file().is_ok() {
+                for (heuristic, name) in aco_functions_geo.iter() {
+                    let filename = format!("{}/{}.csv", log_folder.to_str().unwrap(), name);
+                    let res = DynamicGraphExperiment::run_geopoint_config(
+                        &experiment,
+                        heuristic,
+                        filename.as_str(),
+                    );
+                    if let Err(e) = res {
+                        eprintln!("{}", e);
+                    }
+                }
+            } else {
+                for (heuristic, name) in aco_functions_usize.iter() {
                     let filename = format!("{}/{}.csv", log_folder.to_str().unwrap(), name);
                     let res = DynamicGraphExperiment::run_usize_config(
                         &experiment,
