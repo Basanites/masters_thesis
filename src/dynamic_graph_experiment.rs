@@ -59,7 +59,14 @@ impl DynamicGraphExperiment {
         if let Ok(grid) = config.graph_creation.grid() {
             let rc = RefCell::new(rng64(grid.seed as u128));
             let nw_delta = grid.nw_range.1 - grid.nw_range.0;
-            let mut nw_gen = || rc.borrow_mut().rand_float() * nw_delta + grid.nw_range.0;
+            let mut nw_gen = || {
+                let mut rng = rc.borrow_mut();
+                if rng.rand_float() < grid.node_weight_probability {
+                    rng.rand_float() * nw_delta + grid.nw_range.0
+                } else {
+                    0.0
+                }
+            };
             let ew_delta = grid.ew_range.1 - grid.ew_range.0;
             let mut ew_gen = || rc.borrow_mut().rand_float() * ew_delta + grid.ew_range.0;
             let mut grid_gen = Grid::new(

@@ -56,7 +56,8 @@ where
         + Serialize
         + Default
         + Zero
-        + AddAssign<NodeWeightType>,
+        + AddAssign<NodeWeightType>
+        + PartialEq,
     EdgeWeightType: Copy
         + Zero
         + Add<Output = EdgeWeightType>
@@ -130,8 +131,10 @@ where
         for node in solution.iter_unique_nodes() {
             visited_nodes += 1;
             if let Ok(weight) = g_borrow.node_weight(node) {
-                val_sum += *weight;
-                visited_with_val += 1;
+                if *weight != NodeWeightType::zero() {
+                    visited_with_val += 1;
+                    val_sum += *weight;
+                }
             }
         }
 
@@ -390,7 +393,7 @@ impl<'a, IndexType, Nw, Ew, W> Metaheuristic<'a, IndexType, Nw, Ew>
     for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Debug + Add<Output = Nw> + Serialize + Default + Zero + AddAssign<Nw>,
+    Nw: Copy + Debug + Add<Output = Nw> + Serialize + Default + Zero + AddAssign<Nw> + PartialEq,
     Ew: Copy
         + Zero
         + Add<Output = Ew>
@@ -460,7 +463,7 @@ where
 impl<'a, IndexType, Nw, Ew, W> Iterator for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Debug + Add<Output = Nw> + Serialize + Default + Zero + AddAssign<Nw>,
+    Nw: Copy + Debug + Add<Output = Nw> + Serialize + Default + Zero + AddAssign<Nw> + PartialEq,
     Ew: Copy
         + Zero
         + Add<Output = Ew>
