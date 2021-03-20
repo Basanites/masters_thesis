@@ -8,6 +8,7 @@ pub use supervisor::Supervisor;
 
 use crate::graph::GenericWeightedGraph;
 use crate::metaheuristic::{solution_length, Heuristic, Metaheuristic, ProblemInstance, Solution};
+use crate::util::SmallVal;
 
 use num_traits::identities::Zero;
 use serde::Serialize;
@@ -53,11 +54,13 @@ where
     NodeWeightType: Copy
         + Debug
         + Add<Output = NodeWeightType>
+        + Sub<Output = NodeWeightType>
         + Serialize
         + Default
         + Zero
         + AddAssign<NodeWeightType>
-        + PartialEq,
+        + PartialEq
+        + SmallVal<NodeWeightType>,
     EdgeWeightType: Copy
         + Zero
         + Add<Output = EdgeWeightType>
@@ -131,9 +134,9 @@ where
         for node in solution.iter_unique_nodes() {
             visited_nodes += 1;
             if let Ok(weight) = g_borrow.node_weight(node) {
-                if *weight != NodeWeightType::zero() {
+                if *weight != NodeWeightType::small() {
                     visited_with_val += 1;
-                    val_sum += *weight;
+                    val_sum += *weight - NodeWeightType::small();
                 }
             }
         }
@@ -222,7 +225,7 @@ where
         let g_borrowed = self.graph.borrow();
         for (from, to) in self.best_solution.iter_edges() {
             let original_distance = *g_borrowed.edge_weight((*from, *to)).unwrap();
-            temp_visited.insert(*from, true);
+            // temp_visited.insert(*from, true);
             let t_weight = g_borrowed.node_weight(*to).unwrap();
             // if we already visited the node we can ignore it
             max = if temp_visited.contains_key(to) {
@@ -393,7 +396,16 @@ impl<'a, IndexType, Nw, Ew, W> Metaheuristic<'a, IndexType, Nw, Ew>
     for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Debug + Add<Output = Nw> + Serialize + Default + Zero + AddAssign<Nw> + PartialEq,
+    Nw: Copy
+        + Debug
+        + Add<Output = Nw>
+        + Sub<Output = Nw>
+        + Serialize
+        + Default
+        + Zero
+        + AddAssign<Nw>
+        + PartialEq
+        + SmallVal<Nw>,
     Ew: Copy
         + Zero
         + Add<Output = Ew>
@@ -463,7 +475,16 @@ where
 impl<'a, IndexType, Nw, Ew, W> Iterator for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Debug + Add<Output = Nw> + Serialize + Default + Zero + AddAssign<Nw> + PartialEq,
+    Nw: Copy
+        + Debug
+        + Add<Output = Nw>
+        + Sub<Output = Nw>
+        + Serialize
+        + Default
+        + Zero
+        + AddAssign<Nw>
+        + PartialEq
+        + SmallVal<Nw>,
     Ew: Copy
         + Zero
         + Add<Output = Ew>

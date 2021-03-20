@@ -124,7 +124,6 @@ where
         let mut goal_reached = false;
         let mut visited: HashMap<IndexType, bool> = HashMap::new();
         while !goal_reached {
-            println!("{}", solution);
             // calculate the sums of the weighted heuristic and pheromones for all neighbors of next_node
             let weighted_pheromone_sum = self
                 .pheromone_matrix
@@ -138,7 +137,12 @@ where
                 .unwrap()
                 .inspect(|_| evals += 1) // increment evals for each call to heuristic
                 .fold(0.0, |acc, (to, weight)| {
-                    acc + self.weighted_heuristic(to, *weight, tail_length)
+                    acc + self.conditional_weighted_heuristic(
+                        !visited.contains_key(&to),
+                        to,
+                        *weight,
+                        tail_length,
+                    )
                 });
 
             // as soon, as we reach a point where the sum of the weighted pheromones and heuristic
@@ -151,7 +155,7 @@ where
                 // not the pheromone graph, so we have to get it from there specifically
                 let distance = *self.graph.borrow().edge_weight((next_node, id)).unwrap();
                 let weighted_heuristic = self.conditional_weighted_heuristic(
-                    visited.contains_key(&id),
+                    !visited.contains_key(&id),
                     id,
                     distance,
                     tail_length,
@@ -173,6 +177,11 @@ where
                     break;
                 }
             }
+            println!(
+                "{:?} - {:?}",
+                next_node,
+                self.pheromone_matrix.neighbor_ids(next_node)
+            );
         }
 
         let g_borrow = self.graph.borrow();

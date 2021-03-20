@@ -15,6 +15,7 @@ use crate::metaheuristic::{
     aco, two_swap, Aco, Heuristic, Metaheuristic, ProblemInstance, TwoSwap,
 };
 use crate::rng::rng64;
+use crate::util::SmallVal;
 
 pub struct DynamicGraphExperiment {}
 
@@ -62,9 +63,9 @@ impl DynamicGraphExperiment {
             let mut nw_gen = || {
                 let mut rng = rc.borrow_mut();
                 if rng.rand_float() < grid.node_weight_probability {
-                    rng.rand_float() * nw_delta + grid.nw_range.0
+                    rng.rand_float() * nw_delta + grid.nw_range.0 + f64::small()
                 } else {
-                    0.0
+                    f64::small()
                 }
             };
             let ew_delta = grid.ew_range.1 - grid.ew_range.0;

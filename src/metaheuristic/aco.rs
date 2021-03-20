@@ -139,7 +139,6 @@ where
         for ant in ants {
             solutions.push(ant.get_solution())
         }
-        println!("iteration done");
 
         let start_time = Instant::now();
         let mut best_length = f64::zero();
