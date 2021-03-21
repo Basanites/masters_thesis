@@ -116,24 +116,22 @@ where
     }
 
     fn single_iteration(&mut self) -> Option<&Solution<IndexType>> {
-        let ants = vec![
-            {
-                let (sender, id) = self.supervisor.new_ant();
-                Ant::new(
-                    self.graph,
-                    &self.pheromone_matrix,
-                    self.goal_point,
-                    self.max_time,
-                    self.heuristic,
-                    self.rng.rand_u64() as u128 + ((self.rng.rand_u64() as u128) << 64),
-                    self.alpha,
-                    self.beta,
-                    sender,
-                    id,
-                )
-            };
-            self.ant_count
-        ];
+        let mut ants = Vec::with_capacity(self.ant_count);
+        for _ in 0..self.ant_count {
+            let (sender, id) = self.supervisor.new_ant();
+            ants.push(Ant::new(
+                self.graph,
+                &self.pheromone_matrix,
+                self.goal_point,
+                self.max_time,
+                self.heuristic,
+                self.rng.rand_u64() as u128 + ((self.rng.rand_u64() as u128) << 64),
+                self.alpha,
+                self.beta,
+                sender,
+                id,
+            ));
+        }
 
         let mut solutions = Vec::new();
         for ant in ants {
@@ -183,8 +181,7 @@ where
             nodes_with_val,
             val_sum,
         )); // Ant 0 is always supervisor
-        self.supervisor.aggregate_receive();
-        self.supervisor.reset();
+        self.supervisor.prepare_next();
         if best_score > self.best_score {
             self.pheromone_update(&best_solution, best_length);
             self.best_solution = best_solution;

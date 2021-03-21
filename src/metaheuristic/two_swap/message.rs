@@ -89,8 +89,8 @@ impl<Nw: Serialize, Ew: Serialize> Serialize for Message<Nw, Ew> {
     where
         S: Serializer,
     {
-        // 3 is the number of fields in the struct.
-        let mut state = serializer.serialize_struct("Message", 3)?;
+        // 11 is the number of fields in the struct.
+        let mut state = serializer.serialize_struct("Message", 11)?;
         state.serialize_field("iteration", &self.iteration)?;
         state.serialize_field("evaluations", &self.evaluations)?;
         state.serialize_field("n_improvements", &self.n_improvements)?;

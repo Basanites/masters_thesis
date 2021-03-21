@@ -1,6 +1,7 @@
 use crate::metaheuristic::supervisor;
 use crate::metaheuristic::supervisor::MessageInfo;
 
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -89,5 +90,28 @@ impl<Nw: Copy, Ew: Copy> supervisor::Message for Message<Nw, Ew> {
             self.visited_nodes_with_val,
             self.collected_val,
         )
+    }
+}
+
+impl<Nw: Serialize, Ew: Serialize> Serialize for Message<Nw, Ew> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // 12 is the number of fields in the struct.
+        let mut state = serializer.serialize_struct("Message", 12)?;
+        state.serialize_field("iteration", &self.iteration)?;
+        state.serialize_field("ant", &self.ant_id)?;
+        state.serialize_field("evaluations", &self.evaluations)?;
+        state.serialize_field("n_improvements", &self.n_improvements)?;
+        state.serialize_field("changes", &self.changes)?;
+        state.serialize_field("phase", &self.phase)?;
+        state.serialize_field("cpu_time_mus", &self.cpu_time.as_micros())?;
+        state.serialize_field("distance", &self.distance)?;
+        state.serialize_field("heuristic_score", &self.heuristic_score)?;
+        state.serialize_field("visited_nodes", &self.visited_nodes)?;
+        state.serialize_field("visited_nodes_with_val", &self.visited_nodes_with_val)?;
+        state.serialize_field("collected_val", &self.collected_val)?;
+        state.end()
     }
 }

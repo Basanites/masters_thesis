@@ -3,7 +3,7 @@ use crate::metaheuristic::aco::Message;
 use crate::metaheuristic::{Heuristic, Solution};
 use crate::rng::rng64;
 
-use num_traits::identities::Zero;
+use num_traits::identities::{One, Zero};
 use num_traits::Pow;
 use serde::Serialize;
 use std::cell::RefCell;
@@ -37,7 +37,7 @@ where
 impl<'a, IndexType, Nw> Ant<'a, IndexType, Nw, f64>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Zero + AddAssign<Nw>,
+    Nw: Copy + Zero + One + AddAssign<Nw>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -105,7 +105,8 @@ where
         if cond {
             self.weighted_heuristic(to, edge_weight, tail_length)
         } else {
-            self.weighted_heuristic_with_known_val(Nw::zero(), to, edge_weight, tail_length)
+            self.weighted_heuristic_with_known_val(Nw::one(), to, edge_weight, tail_length)
+            // self.weighted_heuristic_with_known_val(Nw::zero(), to, edge_weight, tail_length)
         }
     }
 
@@ -177,11 +178,6 @@ where
                     break;
                 }
             }
-            println!(
-                "{:?} - {:?}",
-                next_node,
-                self.pheromone_matrix.neighbor_ids(next_node)
-            );
         }
 
         let g_borrow = self.graph.borrow();
