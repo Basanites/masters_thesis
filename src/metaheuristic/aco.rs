@@ -13,6 +13,7 @@ use crate::metaheuristic::{
     solution_score_and_length, Heuristic, Metaheuristic, ProblemInstance, Solution,
 };
 use crate::rng::rng64;
+use crate::util::SmallVal;
 
 use num_traits::identities::Zero;
 use oorandom::Rand64;
@@ -54,11 +55,12 @@ where
 impl<'a, IndexType, Nw, W> Aco<'a, IndexType, Nw, f64, W>
 where
     IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Zero + PartialOrd + Serialize,
+    Nw: Copy + Zero + PartialOrd + Serialize + SmallVal<Nw>,
     W: Write,
 {
     fn pheromone_update(&mut self, solution: &Solution<IndexType>, solution_length: f64) {
         let to_add = self.q / solution_length;
+        println!("adding {}", to_add);
 
         for edge in self.pheromone_matrix.edge_ids() {
             let weight = *self.pheromone_matrix.edge_weight(edge).unwrap();
@@ -105,7 +107,7 @@ where
             alpha: params.alpha,
             beta: params.beta,
             rho: params.rho,
-            q: 1.0,
+            q: 100.0,
             ant_count: params.ant_count,
             best_solution: Solution::new(),
             best_score: f64::zero(),
@@ -156,13 +158,17 @@ where
 
         let g_borrow = self.graph.borrow();
         let mut visited_nodes = 0;
-        let mut nodes_with_val = 0;
+        let mut visited_with_val = 0;
         let mut val_sum = 0.0;
-        for node in best_solution.iter_nodes() {
+        for node in best_solution.iter_unique_nodes() {
             visited_nodes += 1;
-            if let Ok(weight) = g_borrow.node_weight(*node) {
-                nodes_with_val += 1;
-                val_sum += *weight;
+            if let Ok(weight) = g_borrow.node_weight(node) {
+                // because we compare only for values being greater than the small val, this could lead to problems.
+                // it is done this way to avoid intensive calculations for absolute float comparison.
+                if *weight > f64::small() {
+                    visited_with_val += 1;
+                    val_sum += *weight - f64::small();
+                }
             }
         }
 
@@ -178,11 +184,12 @@ where
             best_length,
             best_score,
             visited_nodes,
-            nodes_with_val,
+            visited_with_val,
             val_sum,
         )); // Ant 0 is always supervisor
         self.supervisor.prepare_next();
         if best_score > self.best_score {
+            println!("solution improved");
             self.pheromone_update(&best_solution, best_length);
             self.best_solution = best_solution;
             self.best_score = best_score;
