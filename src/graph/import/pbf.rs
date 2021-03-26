@@ -1,4 +1,5 @@
 #![allow(clippy::map_entry)]
+use decorum::R64;
 use osmpbfreader::objects::Node;
 use osmpbfreader::OsmPbfReader;
 use osmpbfreader::{NodeId, OsmId, OsmObj};
@@ -207,8 +208,8 @@ fn contract_nodes(
 /// The nodes are contracted as to not run out of memory for the MatrixGraph.
 pub fn import_pbf(
     path: &str,
-    nw_gen: &mut dyn FnMut() -> f64,
-) -> Result<MatrixGraph<GeoPoint, f64, f64>, ImportError> {
+    nw_gen: &mut dyn FnMut() -> R64,
+) -> Result<MatrixGraph<GeoPoint, R64, R64>, ImportError> {
     let file_open = File::open(path);
     let file;
     match file_open {
@@ -308,7 +309,7 @@ pub fn import_pbf(
         }
     }
 
-    let mut mapped_graph = MatrixGraph::<GeoPoint, f64, f64>::with_size(node_map.len());
+    let mut mapped_graph = MatrixGraph::<GeoPoint, R64, R64>::with_size(node_map.len());
 
     // Insert nodes into the graph with fixed weight 1
     for (_, point) in &node_map {
@@ -323,7 +324,7 @@ pub fn import_pbf(
                 // TODO: when logger is here this needs to go to errorlog
                 let _ = mapped_graph.add_edge(
                     (node_map[from_id], node_map[to_id]),
-                    traveltime_from_distance_map(dist_map),
+                    R64::from_inner(traveltime_from_distance_map(dist_map)),
                 );
             }
         }
@@ -337,8 +338,10 @@ pub fn import_pbf(
                 let m_tid = node_map[to_id];
                 if !mapped_graph.has_edge((m_fid, m_tid)) {
                     // TODO: when logger is here this needs to go to errorlog
-                    let _ = mapped_graph
-                        .add_edge((m_fid, m_tid), traveltime_from_distance_map(dist_map));
+                    let _ = mapped_graph.add_edge(
+                        (m_fid, m_tid),
+                        R64::from_inner(traveltime_from_distance_map(dist_map)),
+                    );
                 }
             }
         }

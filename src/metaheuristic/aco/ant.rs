@@ -3,8 +3,8 @@ use crate::metaheuristic::aco::Message;
 use crate::metaheuristic::{Heuristic, Solution};
 use crate::rng::rng64;
 
+use decorum::{Real, R64};
 use num_traits::identities::{One, Zero};
-use num_traits::Pow;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
@@ -23,7 +23,7 @@ where
     graph: &'a RefCell<
         dyn GenericWeightedGraph<IndexType = IndexType, NodeWeightType = Nw, EdgeWeightType = Ew>,
     >,
-    pheromone_matrix: &'a MatrixGraph<IndexType, (), f64>,
+    pheromone_matrix: &'a MatrixGraph<IndexType, (), R64>,
     goal_point: IndexType,
     max_time: Ew,
     alpha: f64,
@@ -34,9 +34,9 @@ where
     id: usize,
 }
 
-impl<'a, IndexType, Nw> Ant<'a, IndexType, Nw, f64>
+impl<'a, IndexType, Nw> Ant<'a, IndexType, Nw, R64>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
+    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     Nw: Copy + Zero + One + AddAssign<Nw>,
 {
     #[allow(clippy::too_many_arguments)]
@@ -45,17 +45,17 @@ where
             dyn GenericWeightedGraph<
                 IndexType = IndexType,
                 NodeWeightType = Nw,
-                EdgeWeightType = f64,
+                EdgeWeightType = R64,
             >,
         >,
-        pheromone_matrix: &'a MatrixGraph<IndexType, (), f64>,
+        pheromone_matrix: &'a MatrixGraph<IndexType, (), R64>,
         goal_point: IndexType,
-        max_time: f64,
-        heuristic: &'a Heuristic<IndexType, Nw, f64>,
+        max_time: R64,
+        heuristic: &'a Heuristic<IndexType, Nw, R64>,
         rng_seed: u128,
         alpha: f64,
         beta: f64,
-        sender: Sender<Message<Nw, f64>>,
+        sender: Sender<Message<Nw, R64>>,
         id: usize,
     ) -> Self {
         Ant {
@@ -72,7 +72,7 @@ where
         }
     }
 
-    fn weighted_heuristic(&self, to: IndexType, edge_weight: f64, tail_length: f64) -> f64 {
+    fn weighted_heuristic(&self, to: IndexType, edge_weight: R64, tail_length: R64) -> R64 {
         self.weighted_heuristic_with_known_val(
             *self.graph.borrow().node_weight(to).unwrap(),
             to,
@@ -85,12 +85,12 @@ where
         &self,
         value: Nw,
         to: IndexType,
-        edge_weight: f64,
-        tail_length: f64,
-    ) -> f64 {
-        f64::pow(
+        edge_weight: R64,
+        tail_length: R64,
+    ) -> R64 {
+        R64::powf(
             (self.heuristic)(value, edge_weight, to, tail_length / self.max_time),
-            self.beta,
+            R64::from_inner(self.beta),
         )
     }
 
@@ -99,9 +99,9 @@ where
         &self,
         cond: bool,
         to: IndexType,
-        edge_weight: f64,
-        tail_length: f64,
-    ) -> f64 {
+        edge_weight: R64,
+        tail_length: R64,
+    ) -> R64 {
         if cond {
             self.weighted_heuristic(to, edge_weight, tail_length)
         } else {
@@ -115,12 +115,12 @@ where
         let mut evals = 0;
         let mut n_improvements = 0;
         let mut changes = 0;
-        let mut score = 0.0;
+        let mut score = R64::zero();
         let mut rng = rng64(self.rng_seed);
         let mut solution = Solution::new();
         solution.push_node(self.goal_point);
 
-        let mut tail_length = 0.0;
+        let mut tail_length = R64::zero();
         let mut next_node = self.goal_point;
         let mut goal_reached = false;
         let mut visited: HashMap<IndexType, bool> = HashMap::new();
@@ -130,14 +130,16 @@ where
                 .pheromone_matrix
                 .iter_neighbors(next_node)
                 .unwrap()
-                .fold(0.0, |acc, (_, weight)| acc + f64::pow(*weight, self.alpha));
+                .fold(R64::zero(), |acc, (_, weight)| {
+                    acc + R64::powf(*weight, R64::from_inner(self.alpha))
+                });
             let weighted_heuristic_sum = self
                 .graph
                 .borrow()
                 .iter_neighbors(next_node)
                 .unwrap()
                 .inspect(|_| evals += 1) // increment evals for each call to heuristic
-                .fold(0.0, |acc, (to, weight)| {
+                .fold(R64::zero(), |acc, (to, weight)| {
                     acc + self.conditional_weighted_heuristic(
                         !visited.contains_key(&to),
                         to,
@@ -149,8 +151,9 @@ where
             // as soon, as we reach a point where the sum of the weighted pheromones and heuristic
             // is equal to the random number, we have hit the value with the correct probability
             // according to the formula at https://en.wikipedia.org/wiki/Ant_colony_optimization_algorithms#Edge_selection
-            let rand = rng.rand_float() * weighted_heuristic_sum * weighted_pheromone_sum;
-            let mut sum = 0.0;
+            let rand =
+                R64::from_inner(rng.rand_float()) * weighted_heuristic_sum * weighted_pheromone_sum;
+            let mut sum = R64::zero();
             for (id, pheromone_level) in self.pheromone_matrix.iter_neighbors(next_node).unwrap() {
                 // the edge weight we want to use for the heuristic needs to be got from the distance graph,
                 // not the pheromone graph, so we have to get it from there specifically
@@ -161,7 +164,8 @@ where
                     distance,
                     tail_length,
                 );
-                sum += weighted_heuristic * f64::pow(*pheromone_level, self.alpha);
+                sum +=
+                    weighted_heuristic * R64::powf(*pheromone_level, R64::from_inner(self.alpha));
                 evals += 1;
 
                 // sum is bigger than the random value we generated, so we hit our node

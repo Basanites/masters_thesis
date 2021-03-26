@@ -1,6 +1,8 @@
+mod bounds;
+mod num_traits;
 mod point;
 pub mod scale;
-mod small_val;
 
+pub use crate::util::num_traits::SmallVal;
+pub use bounds::{Max, Min};
 pub use point::Point;
-pub use small_val::SmallVal;

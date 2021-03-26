@@ -9,11 +9,12 @@ pub use solution::{
 };
 pub use two_swap::TwoSwap;
 
+use decorum::R64;
 use std::cell::RefCell;
 
 use crate::graph::GenericWeightedGraph;
 
-pub type Heuristic<IndexType, Nw, Ew> = dyn Fn(Nw, Ew, IndexType, Ew) -> f64;
+pub type Heuristic<IndexType, Nw, Ew> = dyn Fn(Nw, Ew, IndexType, Ew) -> R64;
 
 pub trait Metaheuristic<'a, IndexType, NodeWeightType, EdgeWeightType> {
     type Params;

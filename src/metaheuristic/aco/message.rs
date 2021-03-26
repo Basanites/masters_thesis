@@ -1,6 +1,7 @@
 use crate::metaheuristic::supervisor;
 use crate::metaheuristic::supervisor::MessageInfo;
 
+use decorum::R64;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::time::Duration;
 
@@ -14,7 +15,7 @@ pub struct Message<Nw, Ew> {
     pub changes: usize,
     pub phase: usize,
     pub distance: Ew,
-    pub heuristic_score: f64,
+    pub heuristic_score: R64,
     pub visited_nodes: usize,
     pub visited_nodes_with_val: usize,
     pub collected_val: Nw,
@@ -30,7 +31,7 @@ impl<Nw, Ew> Message<Nw, Ew> {
         phase: usize,
         cpu_time: Duration,
         distance: Ew,
-        heuristic_score: f64,
+        heuristic_score: R64,
         visited_nodes: usize,
         visited_nodes_with_val: usize,
         collected_val: Nw,

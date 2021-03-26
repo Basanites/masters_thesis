@@ -1,6 +1,11 @@
 use super::Generate;
 use crate::graph::{GenericWeightedGraph, MatrixGraph};
 use crate::rng::preseeded_rng64;
+use crate::util::Max;
+
+use num_traits::Zero;
+use std::fmt::Debug;
+use std::ops::Add;
 
 pub struct ErdosRenyi<'a, Nw, Ew>
 where
@@ -29,7 +34,11 @@ impl<'a, Nw: Clone, Ew: Clone> ErdosRenyi<'a, Nw, Ew> {
     }
 }
 
-impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for ErdosRenyi<'a, Nw, Ew> {
+impl<'a, Nw, Ew> Generate<Nw, Ew> for ErdosRenyi<'a, Nw, Ew>
+where
+    Nw: 'static + Copy,
+    Ew: 'static + Copy + Ord + Zero + Debug + Add + Max,
+{
     fn generate(&mut self) -> MatrixGraph<usize, Nw, Ew> {
         let mut rng = preseeded_rng64();
         let mut graph = MatrixGraph::<usize, Nw, Ew>::with_size(self.size);

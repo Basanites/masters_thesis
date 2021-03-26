@@ -7,9 +7,11 @@ pub mod import;
 mod matrix_graph;
 
 use crate::geo::GeoPoint;
+use crate::metaheuristic::Solution;
 pub use error::GraphError;
 pub use matrix_graph::MatrixGraph;
 
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 
 pub type Edge<IndexType> = (IndexType, IndexType);
@@ -140,6 +142,12 @@ pub trait GenericWeightedGraph {
         edge: Edge<Self::IndexType>,
         weight: Self::EdgeWeightType,
     ) -> Result<(), GraphError<Self::IndexType>>;
+
+    /// Calculates the shortest path to the given node from all other nodes.
+    fn shortest_paths(
+        &self,
+        to_node: Self::IndexType,
+    ) -> HashMap<Self::IndexType, Solution<Self::IndexType>>;
 }
 
 pub trait WeightedGraph: GenericWeightedGraph<IndexType = usize> {}

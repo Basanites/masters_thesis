@@ -1,4 +1,4 @@
-#![feature(test, min_specialization, map_into_keys_values)]
+#![feature(test, min_specialization, map_into_keys_values, total_cmp)]
 #![allow(dead_code)]
 mod dynamic_graph_experiment;
 mod experiment_config;
@@ -14,26 +14,27 @@ use experiment_config::{
 };
 use geo::GeoPoint;
 
+use decorum::R64;
 use glob::glob;
 use std::fs::{create_dir, write, File};
 use std::io::ErrorKind;
 
-type UsizeHeuristic = dyn Fn(f64, f64, usize, f64) -> f64;
-type GeoPointHeuristic = dyn Fn(f64, f64, GeoPoint, f64) -> f64;
+type UsizeHeuristic = dyn Fn(R64, R64, usize, R64) -> R64;
+type GeoPointHeuristic = dyn Fn(R64, R64, GeoPoint, R64) -> R64;
 
-fn two_swap_h1<IndexType>(nw: f64, _ew: f64, _id: IndexType, _elapsed: f64) -> f64 {
+fn two_swap_h1<IndexType>(nw: R64, _ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
     nw
 }
 
-fn two_swap_h2<IndexType>(nw: f64, ew: f64, _id: IndexType, _elapsed: f64) -> f64 {
+fn two_swap_h2<IndexType>(nw: R64, ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
     nw / ew
 }
 
-fn aco_h1<IndexType>(nw: f64, _ew: f64, _id: IndexType, _elapsed: f64) -> f64 {
+fn aco_h1<IndexType>(nw: R64, _ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
     nw
 }
 
-fn aco_h2<IndexType>(nw: f64, ew: f64, _id: IndexType, _elapsed: f64) -> f64 {
+fn aco_h2<IndexType>(nw: R64, ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
     nw / ew
 }
 

@@ -1,7 +1,12 @@
 use super::Generate;
 use crate::graph::{GenericWeightedGraph, MatrixGraph};
 use crate::rng::preseeded_rng64;
+use crate::util::Max;
+
+use num_traits::Zero;
 use oorandom::Rand64;
+use std::fmt::Debug;
+use std::ops::Add;
 
 pub struct StochasticBlock<'a, Nw, Ew>
 where
@@ -33,7 +38,11 @@ impl<'a, Nw: Clone, Ew: Clone> StochasticBlock<'a, Nw, Ew> {
     }
 }
 
-impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for StochasticBlock<'a, Nw, Ew> {
+impl<'a, Nw: 'static + Copy, Ew: 'static + Copy> Generate<Nw, Ew> for StochasticBlock<'a, Nw, Ew>
+where
+    Nw: 'static + Copy,
+    Ew: 'static + Copy + Debug + Max + Zero + Add + Ord,
+{
     fn generate(&mut self) -> MatrixGraph<usize, Nw, Ew> {
         let size = self.community_size * self.probability_matrix.len();
         let mut graph = MatrixGraph::<usize, Nw, Ew>::with_size(size);

@@ -1,10 +1,14 @@
-use std::cmp::Eq;
-use std::collections::HashMap;
+use num_traits::Zero;
+use std::cmp::{Eq, Ord, Ordering};
+use std::collections::{BinaryHeap, HashMap};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::marker::PhantomData;
+use std::ops::Add;
 
 use crate::graph::{Edge, GenericWeightedGraph, GraphError};
+use crate::metaheuristic::Solution;
+use crate::util::Max;
 
 #[derive(Debug, Clone)]
 pub struct MatrixGraph<IndexType: Clone, Nw, Ew> {
@@ -56,51 +60,51 @@ impl<Nw: Clone, Ew: Clone> MatrixGraph<usize, Nw, Ew> {
     }
 }
 
-#[allow(dead_code)]
-impl MatrixGraph<usize, (), ()> {
-    /// Constructs an unweighted MatrixGraph using the given amount of nodes and list of edges.
-    pub fn new_unweighted(nodes: usize, edges: &[Edge<usize>]) -> Result<Self, GraphError<usize>> {
-        // initialization works basically the same way as for generic types.
-        let mut graph = MatrixGraph {
-            adjacency_matrix: (0..nodes).map(|_| vec![None; nodes]).collect(),
-            node_weights: vec![Some(()); nodes],
-            order: nodes,
-            size: edges.len(),
-            node_map: HashMap::new(),
-            inv_node_map: HashMap::new(),
-            phantom: PhantomData,
-        };
+// #[allow(dead_code)]
+// impl MatrixGraph<usize, (), ()> {
+//     /// Constructs an unweighted MatrixGraph using the given amount of nodes and list of edges.
+//     pub fn new_unweighted(nodes: usize, edges: &[Edge<usize>]) -> Result<Self, GraphError<usize>> {
+//         // initialization works basically the same way as for generic types.
+//         let mut graph = MatrixGraph {
+//             adjacency_matrix: (0..nodes).map(|_| vec![None; nodes]).collect(),
+//             node_weights: vec![Some(()); nodes],
+//             order: nodes,
+//             size: edges.len(),
+//             node_map: HashMap::new(),
+//             inv_node_map: HashMap::new(),
+//             phantom: PhantomData,
+//         };
 
-        // A lot of places where to_owned is used. Could possibly be simplified.
-        for (from, to) in edges.iter() {
-            if from >= &nodes {
-                return Err(GraphError::MissingNode(*from));
-            } else if to >= &nodes {
-                return Err(GraphError::MissingNode(*to));
-            }
+//         // A lot of places where to_owned is used. Could possibly be simplified.
+//         for (from, to) in edges.iter() {
+//             if from >= &nodes {
+//                 return Err(GraphError::MissingNode(*from));
+//             } else if to >= &nodes {
+//                 return Err(GraphError::MissingNode(*to));
+//             }
 
-            graph.adjacency_matrix[*from][*to] = Some(());
-        }
+//             graph.adjacency_matrix[*from][*to] = Some(());
+//         }
 
-        Ok(graph)
-    }
+//         Ok(graph)
+//     }
 
-    /// Constructs an empty unweighted MatrixGraph.
-    pub fn default_unweighted() -> Self {
-        MatrixGraph::default()
-    }
+//     /// Constructs an empty unweighted MatrixGraph.
+//     pub fn default_unweighted() -> Self {
+//         MatrixGraph::default()
+//     }
 
-    /// Constructs an unweighted MatrixGraph with capacity for at least the given amount of nodes.
-    pub fn unweighted_with_size(size: usize) -> Self {
-        MatrixGraph::with_size(size)
-    }
-}
+//     /// Constructs an unweighted MatrixGraph with capacity for at least the given amount of nodes.
+//     pub fn unweighted_with_size(size: usize) -> Self {
+//         MatrixGraph::with_size(size)
+//     }
+// }
 
 impl<IndexType, Nw, Ew> MatrixGraph<IndexType, Nw, Ew>
 where
-    IndexType: Hash + Copy + Eq + Display + Debug,
+    IndexType: Hash + Copy + Eq + Display + Debug + Ord,
     Nw: Copy,
-    Ew: Copy,
+    Ew: Copy + Max + Zero + Add + Debug + Ord,
 {
     pub fn new(
         nodes: Vec<(IndexType, Nw)>,
@@ -445,14 +449,90 @@ where
             self._add_edge(edge, weight)
         }
     }
+
+    fn _shortest_path(&self, to_node: usize) -> Vec<Solution<usize>> {
+        // dist[node] = current shortest distance from `start` to `node`
+        let mut dist: Vec<_> = (0..self.adjacency_matrix.len())
+            .map(|_| <Ew as Max>::max())
+            .collect();
+
+        let mut prev: Vec<usize> = Vec::with_capacity(self.adjacency_matrix.len());
+
+        let mut heap: BinaryHeap<State<usize, Ew>> =
+            BinaryHeap::with_capacity(self.adjacency_matrix.len());
+
+        // We're at `start`, with a zero cost
+        dist[to_node] = Ew::zero();
+        heap.push(State {
+            cost: Ew::zero(),
+            position: to_node,
+        });
+
+        // Examine the frontier with lower cost nodes first (min-heap)
+        while let Some(State { cost, position }) = heap.pop() {
+            // Important as we may have already found a better way
+            if cost > dist[position] {
+                continue;
+            }
+
+            // For each node we can reach, see if we can find a way with
+            // a lower cost going through this node
+            for (other, &cost_to) in self._iter_neighbors(position).unwrap() {
+                let next = State {
+                    cost: cost + cost_to,
+                    position: other,
+                };
+
+                // If so, add it to the frontier and continue
+                if cost_to < dist[other] {
+                    heap.push(next);
+                    // Relaxation, we have now found a better way
+                    dist[other] = next.cost;
+                    prev[other] = position;
+                }
+            }
+        }
+
+        println!("{:?}, {:?}", prev, dist);
+
+        Vec::new()
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct State<IndexType, CostType> {
+    cost: CostType,
+    position: IndexType,
+}
+
+// The priority queue depends on `Ord`.
+// Explicitly implement the trait so the queue becomes a min-heap
+// instead of a max-heap.
+impl<IndexType: Ord, CostType: Ord> Ord for State<IndexType, CostType> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Notice that the we flip the ordering on costs.
+        // In case of a tie we compare positions - this step is necessary
+        // to make implementations of `PartialEq` and `Ord` consistent.
+        other
+            .cost
+            .cmp(&self.cost)
+            .then_with(|| self.position.cmp(&other.position))
+    }
+}
+
+// `PartialOrd` needs to be implemented as well.
+impl<IndexType: Ord, CostType: Ord> PartialOrd for State<IndexType, CostType> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[allow(dead_code, clippy::map_entry)]
 impl<IndexType, Nw, Ew> GenericWeightedGraph for MatrixGraph<IndexType, Nw, Ew>
 where
-    IndexType: Hash + Copy + Eq + Debug + Display,
+    IndexType: Hash + Copy + Eq + Display + Debug + Ord,
     Nw: Copy,
-    Ew: Copy,
+    Ew: Copy + Max + Zero + Add + Debug + Ord,
 {
     type IndexType = IndexType;
     type NodeWeightType = Nw;
@@ -670,9 +750,21 @@ where
         let edge = self._change_edge((self.node_map[&edge.0], self.node_map[&edge.1]), weight);
         self.mapped_result(edge)
     }
+
+    default fn shortest_paths(
+        &self,
+        to_node: Self::IndexType,
+    ) -> HashMap<Self::IndexType, Solution<Self::IndexType>> {
+        self._shortest_path(self.node_map[&to_node]);
+        HashMap::new()
+    }
 }
 
-impl<Nw: Copy, Ew: Copy> GenericWeightedGraph for MatrixGraph<usize, Nw, Ew> {
+impl<Nw: Copy, Ew> GenericWeightedGraph for MatrixGraph<usize, Nw, Ew>
+where
+    Nw: Copy,
+    Ew: Copy + Max + Zero + Add + Debug + Ord,
+{
     fn iter_node_ids(&self) -> Box<dyn Iterator<Item = usize> + '_> {
         self._iter_node_ids()
     }
@@ -745,6 +837,11 @@ impl<Nw: Copy, Ew: Copy> GenericWeightedGraph for MatrixGraph<usize, Nw, Ew> {
 
     fn change_edge(&mut self, edge: Edge<usize>, weight: Ew) -> Result<(), GraphError<usize>> {
         self._change_edge(edge, weight)
+    }
+
+    fn shortest_paths(&self, to_node: usize) -> HashMap<usize, Solution<usize>> {
+        self._shortest_path(to_node);
+        HashMap::new()
     }
 }
 

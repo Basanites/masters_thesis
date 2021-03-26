@@ -8,13 +8,14 @@ pub use message::Message;
 pub use params::Params;
 pub use supervisor::Supervisor;
 
-use crate::graph::{Edge, GenericWeightedGraph, MatrixGraph};
+use crate::graph::{GenericWeightedGraph, MatrixGraph};
 use crate::metaheuristic::{
     solution_score_and_length, Heuristic, Metaheuristic, ProblemInstance, Solution,
 };
 use crate::rng::rng64;
 use crate::util::SmallVal;
 
+use decorum::R64;
 use num_traits::identities::Zero;
 use oorandom::Rand64;
 use serde::Serialize;
@@ -36,7 +37,7 @@ where
     graph: &'a RefCell<
         dyn GenericWeightedGraph<IndexType = IndexType, NodeWeightType = Nw, EdgeWeightType = Ew>,
     >,
-    pheromone_matrix: MatrixGraph<IndexType, (), f64>,
+    pheromone_matrix: MatrixGraph<IndexType, (), R64>,
     goal_point: IndexType,
     max_time: Ew,
     heuristic: &'a Heuristic<IndexType, Nw, Ew>,
@@ -52,21 +53,21 @@ where
     rng: Rand64,
 }
 
-impl<'a, IndexType, Nw, W> Aco<'a, IndexType, Nw, f64, W>
+impl<'a, IndexType, Nw, W> Aco<'a, IndexType, Nw, R64, W>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
-    Nw: Copy + Zero + PartialOrd + Serialize + SmallVal<Nw>,
+    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
+    Nw: Copy + Zero + PartialOrd + Serialize + SmallVal,
     W: Write,
 {
-    fn pheromone_update(&mut self, solution: &Solution<IndexType>, solution_length: f64) {
-        let to_add = self.q / solution_length;
+    fn pheromone_update(&mut self, solution: &Solution<IndexType>, solution_length: R64) {
+        let to_add = R64::from_inner(self.q) / solution_length;
         println!("adding {}", to_add);
 
         for edge in self.pheromone_matrix.edge_ids() {
             let weight = *self.pheromone_matrix.edge_weight(edge).unwrap();
             let _res = self
                 .pheromone_matrix
-                .change_edge(edge, (1.0 - self.rho) * weight);
+                .change_edge(edge, R64::from_inner(1.0 - self.rho) * weight);
         }
 
         for (from, to) in solution.iter_edges() {
@@ -78,23 +79,26 @@ where
     }
 }
 
-impl<'a, IndexType, W> Metaheuristic<'a, IndexType, f64, f64> for Aco<'a, IndexType, f64, f64, W>
+impl<'a, IndexType, W> Metaheuristic<'a, IndexType, R64, R64> for Aco<'a, IndexType, R64, R64, W>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display,
+    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     W: Write,
 {
-    type Params = Params<'a, IndexType, f64, f64>;
-    type SupervisorType = Supervisor<W, f64, f64>;
+    type Params = Params<'a, IndexType, R64, R64>;
+    type SupervisorType = Supervisor<W, R64, R64>;
 
     fn new(
-        problem: ProblemInstance<'a, IndexType, f64, f64>,
+        problem: ProblemInstance<'a, IndexType, R64, R64>,
         params: Self::Params,
         supervisor: Self::SupervisorType,
     ) -> Self {
         let graph = problem.graph.borrow();
         let pheromones = MatrixGraph::new(
             graph.iter_node_ids().map(|id| (id, ())).collect(),
-            graph.iter_edge_ids().map(|edge| (edge, 1.0)).collect(),
+            graph
+                .iter_edge_ids()
+                .map(|edge| (edge, R64::from_inner(1.0)))
+                .collect(),
         )
         .unwrap();
 
@@ -110,8 +114,8 @@ where
             q: 100.0,
             ant_count: params.ant_count,
             best_solution: Solution::new(),
-            best_score: f64::zero(),
-            best_length: f64::zero(),
+            best_score: R64::zero(),
+            best_length: R64::zero(),
             supervisor,
             rng: rng64(params.seed),
         }
@@ -141,8 +145,8 @@ where
         }
 
         let start_time = Instant::now();
-        let mut best_length = f64::zero();
-        let mut best_score = f64::zero();
+        let mut best_length = R64::zero();
+        let mut best_score = R64::zero();
         let mut best_solution = Solution::new();
         let mut improvements = 0;
         for solution in solutions.into_iter() {
@@ -159,15 +163,15 @@ where
         let g_borrow = self.graph.borrow();
         let mut visited_nodes = 0;
         let mut visited_with_val = 0;
-        let mut val_sum = 0.0;
+        let mut val_sum = R64::zero();
         for node in best_solution.iter_unique_nodes() {
             visited_nodes += 1;
             if let Ok(weight) = g_borrow.node_weight(node) {
                 // because we compare only for values being greater than the small val, this could lead to problems.
                 // it is done this way to avoid intensive calculations for absolute float comparison.
-                if *weight > f64::small() {
+                if *weight > R64::small() {
                     visited_with_val += 1;
-                    val_sum += *weight - f64::small();
+                    val_sum += *weight - R64::small();
                 }
             }
         }

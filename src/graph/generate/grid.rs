@@ -1,8 +1,13 @@
 use super::Generate;
 use crate::graph::{GenericWeightedGraph, MatrixGraph};
+use crate::util::Max;
+
+use decorum::R64;
+use num_traits::Zero;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::ops::Add;
 
 pub struct Grid<'a, Nw, Ew>
 where
@@ -32,8 +37,10 @@ impl<'a, Nw: Clone, Ew: Clone> Grid<'a, Nw, Ew> {
 
 /// 'static lifetime needed here. See https://stackoverflow.com/questions/32625583/parameter-type-may-not-live-long-enough for explanation.
 /// tldr: Any type without stored references satisfies any lifetime. Thus e.g. all primitives satisfy 'static.
-impl<'a, Nw: 'static + Copy + Debug, Ew: 'static + Copy + Debug> Generate<Nw, Ew>
-    for Grid<'a, Nw, Ew>
+impl<'a, Nw, Ew> Generate<Nw, Ew> for Grid<'a, Nw, Ew>
+where
+    Nw: 'static + Copy + Debug,
+    Ew: 'static + Copy + Ord + Zero + Debug + Add + Max,
 {
     fn generate(&mut self) -> MatrixGraph<usize, Nw, Ew> {
         let mut graph = MatrixGraph::<usize, Nw, Ew>::with_size(self.size.0 * self.size.1);
@@ -123,12 +130,12 @@ mod tests {
 
     #[test]
     fn constant_weighted_works() {
-        let mut node_gen = || 1.0;
-        let mut edge_gen = || 2.0;
+        let mut node_gen = || R64::from_inner(1.0);
+        let mut edge_gen = || R64::from_inner(2.0);
         let mut gen = Grid::new((5, 5), &mut node_gen, &mut edge_gen);
         let graph = gen.generate();
-        let nodes: Vec<(usize, &f64)> = graph.iter_nodes().collect();
-        let edges: Vec<((usize, usize), &f64)> = graph.iter_edges().collect();
+        let nodes: Vec<(usize, &R64)> = graph.iter_nodes().collect();
+        let edges: Vec<((usize, usize), &R64)> = graph.iter_edges().collect();
 
         assert_eq!(nodes.len(), 25, "A 5x5 grid graph should have 25 nodes.");
         assert_eq!(
@@ -154,12 +161,12 @@ mod tests {
     fn random_weighted_works() {
         let mut node_rng = preseeded_rng64();
         let mut edge_rng = preseeded_rng64();
-        let mut node_gen = || node_rng.rand_float();
-        let mut edge_gen = || edge_rng.rand_float();
+        let mut node_gen = || R64::from_inner(node_rng.rand_float());
+        let mut edge_gen = || R64::from_inner(edge_rng.rand_float());
         let mut gen = Grid::new((5, 5), &mut node_gen, &mut edge_gen);
         let graph = gen.generate();
-        let nodes: Vec<(usize, &f64)> = graph.iter_nodes().collect();
-        let edges: Vec<((usize, usize), &f64)> = graph.iter_edges().collect();
+        let nodes: Vec<(usize, &R64)> = graph.iter_nodes().collect();
+        let edges: Vec<((usize, usize), &R64)> = graph.iter_edges().collect();
 
         assert_eq!(nodes.len(), 25, "A 5x5 grid graph should have 25 nodes.");
         assert_eq!(
@@ -171,12 +178,12 @@ mod tests {
     #[test]
     fn random_weighted_same_rng_works() {
         let rc = RefCell::new(preseeded_rng64());
-        let mut node_gen = || rc.borrow_mut().rand_float();
-        let mut edge_gen = || rc.borrow_mut().rand_float();
+        let mut node_gen = || R64::from_inner(rc.borrow_mut().rand_float());
+        let mut edge_gen = || R64::from_inner(rc.borrow_mut().rand_float());
         let mut gen = Grid::new((5, 5), &mut node_gen, &mut edge_gen);
         let graph = gen.generate();
-        let nodes: Vec<(usize, &f64)> = graph.iter_nodes().collect();
-        let edges: Vec<((usize, usize), &f64)> = graph.iter_edges().collect();
+        let nodes: Vec<(usize, &R64)> = graph.iter_nodes().collect();
+        let edges: Vec<((usize, usize), &R64)> = graph.iter_edges().collect();
 
         assert_eq!(nodes.len(), 25, "A 5x5 grid graph should have 25 nodes.");
         assert_eq!(
