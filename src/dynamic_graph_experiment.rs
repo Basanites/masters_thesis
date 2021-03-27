@@ -86,6 +86,7 @@ impl DynamicGraphExperiment {
                 &mut ew_gen,
             );
             let graph = grid_gen.generate();
+            graph.shortest_paths(0);
 
             //nw_gen is reinitialized here, because we only want it to always create a value now
             let mut nw_gen = || {

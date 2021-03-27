@@ -183,6 +183,16 @@ where
     pub fn unique_nodes(&self) -> Vec<IndexType> {
         self.iter_unique_nodes().collect()
     }
+
+    pub fn reversed(&self) -> Self {
+        Self {
+            node_list: self.node_list.iter().rev().copied().collect(),
+        }
+    }
+
+    pub fn reverse(&mut self) {
+        self.node_list.reverse();
+    }
 }
 
 impl<IndexType: Display> Display for Solution<IndexType> {

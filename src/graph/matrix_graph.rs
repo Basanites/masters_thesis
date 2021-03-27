@@ -310,6 +310,25 @@ where
         ))
     }
 
+    fn _iter_inv_neighbors(
+        &self,
+        id: usize,
+    ) -> Result<Box<dyn Iterator<Item = (usize, &Ew)> + '_>, GraphError<usize>> {
+        if !self._has_node(id) {
+            return Err(GraphError::MissingNode(id));
+        }
+
+        // Get the ids of nodes to which a weighted edge from id exists.
+        Ok(Box::new(
+            self.adjacency_matrix
+                .iter()
+                .map(move |col| col[id])
+                .enumerate()
+                .filter(|(_, x)| x.is_some())
+                .map(move |(i, _)| (i, self._edge_weight((i, id)).unwrap())),
+        ))
+    }
+
     fn _has_node(&self, id: usize) -> bool {
         self.node_weights.len() > id && self.node_weights[id].is_some()
     }
@@ -450,30 +469,82 @@ where
         }
     }
 
-    fn _shortest_path(&self, to_node: usize) -> Vec<Solution<usize>> {
+    fn _inv_shortest_paths(&self, from_node: usize) -> (Vec<Option<usize>>, Vec<Ew>) {
         // dist[node] = current shortest distance from `start` to `node`
-        let mut dist: Vec<_> = (0..self.adjacency_matrix.len())
-            .map(|_| <Ew as Max>::max())
-            .collect();
+        let node_count = self.adjacency_matrix.len();
+        let mut dist: Vec<_> = (0..node_count).map(|_| <Ew as Max>::max()).collect();
 
-        let mut prev: Vec<usize> = Vec::with_capacity(self.adjacency_matrix.len());
+        let mut prev: Vec<Option<usize>> = vec![None; node_count];
+        let mut visited: Vec<bool> = vec![false; node_count];
 
-        let mut heap: BinaryHeap<State<usize, Ew>> =
-            BinaryHeap::with_capacity(self.adjacency_matrix.len());
+        let mut heap: BinaryHeap<State<usize, Ew>> = BinaryHeap::with_capacity(node_count);
 
         // We're at `start`, with a zero cost
-        dist[to_node] = Ew::zero();
+        dist[from_node] = Ew::zero();
+        prev[from_node] = Some(from_node);
         heap.push(State {
             cost: Ew::zero(),
-            position: to_node,
+            position: from_node,
         });
 
         // Examine the frontier with lower cost nodes first (min-heap)
         while let Some(State { cost, position }) = heap.pop() {
             // Important as we may have already found a better way
-            if cost > dist[position] {
+            if visited[position] || cost > dist[position] {
                 continue;
             }
+
+            visited[position] = true;
+
+            // For each node we can reach, see if we can find a way with
+            // a lower cost going through this node
+            for (other, &cost_from) in self._iter_inv_neighbors(position).unwrap() {
+                let next = State {
+                    cost: cost + cost_from,
+                    position: other,
+                };
+
+                // If so, add it to the frontier and continue
+                if next.cost < dist[other] {
+                    if !visited[other] {
+                        heap.push(next);
+                    }
+                    // Relaxation, we have now found a better way
+                    dist[other] = next.cost;
+                    prev[other] = Some(position);
+                }
+            }
+        }
+
+        (prev, dist)
+    }
+
+    fn _shortest_paths(&self, from_node: usize) -> (Vec<Option<usize>>, Vec<Ew>) {
+        // dist[node] = current shortest distance from `start` to `node`
+        let node_count = self.adjacency_matrix.len();
+        let mut dist: Vec<_> = (0..node_count).map(|_| <Ew as Max>::max()).collect();
+
+        let mut prev: Vec<Option<usize>> = vec![None; node_count];
+        let mut visited: Vec<bool> = vec![false; node_count];
+
+        let mut heap: BinaryHeap<State<usize, Ew>> = BinaryHeap::with_capacity(node_count);
+
+        // We're at `start`, with a zero cost
+        dist[from_node] = Ew::zero();
+        prev[from_node] = Some(from_node);
+        heap.push(State {
+            cost: Ew::zero(),
+            position: from_node,
+        });
+
+        // Examine the frontier with lower cost nodes first (min-heap)
+        while let Some(State { cost, position }) = heap.pop() {
+            // Important as we may have already found a better way
+            if visited[position] || cost > dist[position] {
+                continue;
+            }
+
+            visited[position] = true;
 
             // For each node we can reach, see if we can find a way with
             // a lower cost going through this node
@@ -484,18 +555,18 @@ where
                 };
 
                 // If so, add it to the frontier and continue
-                if cost_to < dist[other] {
-                    heap.push(next);
+                if next.cost < dist[other] {
+                    if !visited[other] {
+                        heap.push(next);
+                    }
                     // Relaxation, we have now found a better way
                     dist[other] = next.cost;
-                    prev[other] = position;
+                    prev[other] = Some(position);
                 }
             }
         }
 
-        println!("{:?}, {:?}", prev, dist);
-
-        Vec::new()
+        (prev, dist)
     }
 }
 
@@ -753,10 +824,82 @@ where
 
     default fn shortest_paths(
         &self,
+        from_node: Self::IndexType,
+    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+        let (prevs, dists) = self._shortest_paths(self.node_map[&from_node]);
+        let mut res = HashMap::new();
+
+        for i in 0..prevs.len() {
+            let mut created = false;
+            let mut solution: Solution<Self::IndexType> =
+                Solution::from_nodes(vec![self.inv_node_map[&i]]);
+            let mut prev = prevs[i];
+            while let Some(node) = prev {
+                created = true;
+
+                // only push self once (probably only important for to_node)
+                if i != node {
+                    solution.push_node(self.inv_node_map[&node]);
+                }
+
+                let n_prev = prevs[node];
+                // only to_node has prev[node] == node so we iterate as long as we haven't reached that
+                if n_prev != prev {
+                    prev = n_prev
+                } else {
+                    prev = None
+                }
+            }
+
+            // the solution needs to be reversed for us to start at the from_node
+            solution.reverse();
+
+            if created {
+                res.insert(self.inv_node_map[&i], Some((solution, dists[i])));
+            } else {
+                res.insert(self.inv_node_map[&i], None);
+            }
+        }
+
+        res
+    }
+
+    default fn inv_shortest_paths(
+        &self,
         to_node: Self::IndexType,
-    ) -> HashMap<Self::IndexType, Solution<Self::IndexType>> {
-        self._shortest_path(self.node_map[&to_node]);
-        HashMap::new()
+    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+        let (prevs, dists) = self._inv_shortest_paths(self.node_map[&to_node]);
+        let mut res = HashMap::new();
+
+        for i in 0..prevs.len() {
+            let mut created = false;
+            let mut solution: Solution<Self::IndexType> =
+                Solution::from_nodes(vec![self.inv_node_map[&i]]);
+            let mut prev = prevs[i];
+            while let Some(node) = prev {
+                created = true;
+
+                // only push self once (probably only important for to_node)
+                if i != node {
+                    solution.push_node(self.inv_node_map[&node]);
+                }
+
+                let n_prev = prevs[node];
+                // only to_node has prev[node] == node so we iterate as long as we haven't reached that
+                if n_prev != prev {
+                    prev = n_prev
+                } else {
+                    prev = None
+                }
+            }
+            if created {
+                res.insert(self.inv_node_map[&i], Some((solution, dists[i])));
+            } else {
+                res.insert(self.inv_node_map[&i], None);
+            }
+        }
+
+        res
     }
 }
 
@@ -839,9 +982,84 @@ where
         self._change_edge(edge, weight)
     }
 
-    fn shortest_paths(&self, to_node: usize) -> HashMap<usize, Solution<usize>> {
-        self._shortest_path(to_node);
-        HashMap::new()
+    fn shortest_paths(
+        &self,
+        from_node: usize,
+    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+        let (prevs, dists) = self._shortest_paths(from_node);
+        let mut res = HashMap::new();
+
+        for i in 0..prevs.len() {
+            let mut created = false;
+            let mut solution: Solution<Self::IndexType> = Solution::from_nodes(vec![i]);
+            let mut prev = prevs[i];
+            while let Some(node) = prev {
+                created = true;
+
+                // only push self once (probably only important for to_node)
+                if i != node {
+                    solution.push_node(node);
+                }
+
+                let n_prev = prevs[node];
+                // only to_node has prev[node] == node so we iterate as long as we haven't reached that
+                if n_prev != prev {
+                    prev = n_prev
+                } else {
+                    prev = None
+                }
+            }
+
+            // the solution needs to be reversed for us to start at the from_node
+            solution.reverse();
+
+            // if we can reach the node we created a solution
+            if created {
+                res.insert(i, Some((solution, dists[i])));
+            } else {
+                res.insert(i, None);
+            }
+        }
+
+        res
+    }
+
+    fn inv_shortest_paths(
+        &self,
+        to_node: usize,
+    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+        let (prevs, dists) = self._inv_shortest_paths(to_node);
+        let mut res = HashMap::new();
+
+        for i in 0..prevs.len() {
+            let mut created = false;
+            let mut solution: Solution<Self::IndexType> = Solution::from_nodes(vec![i]);
+            let mut prev = prevs[i];
+            while let Some(node) = prev {
+                created = true;
+
+                // only push self once (probably only important for to_node)
+                if i != node {
+                    solution.push_node(node);
+                }
+
+                let n_prev = prevs[node];
+                // only to_node has prev[node] == node so we iterate as long as we haven't reached that
+                if n_prev != prev {
+                    prev = n_prev
+                } else {
+                    prev = None
+                }
+            }
+            // if we can reach the node we created a solution
+            if created {
+                res.insert(i, Some((solution, dists[i])));
+            } else {
+                res.insert(i, None);
+            }
+        }
+
+        res
     }
 }
 
@@ -860,6 +1078,14 @@ mod usize_indexed_tests {
         MatrixGraph::new_usize_indexed(
             vec![1, 2, 3],
             vec![(0, 1, 100), (1, 2, 101), (2, 1, 50), (2, 0, 200)],
+        )
+        .unwrap()
+    }
+
+    fn inv_valid_weighted() -> MatrixGraph<usize, usize, usize> {
+        MatrixGraph::new_usize_indexed(
+            vec![1, 2, 3],
+            vec![(1, 0, 100), (2, 1, 101), (1, 2, 50), (0, 2, 200)],
         )
         .unwrap()
     }
@@ -1343,6 +1569,96 @@ mod usize_indexed_tests {
         );
     }
 
+    #[test]
+    fn internal_shortest_path_works() {
+        let graph = valid_weighted();
+        let (prevs, dists) = graph._shortest_paths(0);
+
+        assert_eq!(prevs[0], Some(0), "0 should always go via 0");
+        assert_eq!(prevs[1], Some(0), "1 should have a direct path to 0");
+        assert_eq!(prevs[2], Some(1), "2 should go via 1");
+
+        assert_eq!(dists[0], 0, "Distance to start node should be 0");
+        assert_eq!(
+            dists[1], 100,
+            "Distance to 1 should be 100 via straight path"
+        );
+        assert_eq!(dists[2], 201, "Distance to 2 should be 201 via path over 1");
+    }
+
+    #[test]
+    fn shortest_paths_works() {
+        let graph = valid_weighted();
+        let map = graph.shortest_paths(0);
+
+        assert_eq!(
+            map[&0],
+            Some((Solution::from_nodes(vec![0]), 0)),
+            "0 is the start node"
+        );
+        assert_eq!(
+            map[&1],
+            Some((Solution::from_nodes(vec![0, 1]), 100)),
+            "1 should have a direct path to 0 with length 100"
+        );
+        assert_eq!(
+            map[&2],
+            Some((Solution::from_nodes(vec![0, 1, 2]), 201)),
+            "2 should go via 1 and have length 201"
+        );
+    }
+
+    #[test]
+    fn internal_iter_neighbors_inv_works() {
+        let graph = valid_weighted();
+        let neighbors: Vec<_> = graph._iter_inv_neighbors(0).unwrap().collect();
+
+        assert_eq!(
+            neighbors,
+            vec![(2, &200)],
+            "Node 0 only has one inverse neighbor, which is 2"
+        )
+    }
+
+    #[test]
+    fn internal_inv_shortest_path_works() {
+        let graph = inv_valid_weighted();
+        let (prevs, dists) = graph._inv_shortest_paths(0);
+
+        assert_eq!(prevs[0], Some(0), "0 should always go via 0");
+        assert_eq!(prevs[1], Some(0), "1 should have a direct path to 0");
+        assert_eq!(prevs[2], Some(1), "2 should go via 1");
+
+        assert_eq!(dists[0], 0, "Distance to start node should be 0");
+        assert_eq!(
+            dists[1], 100,
+            "Distance to 1 should be 100 via straight path"
+        );
+        assert_eq!(dists[2], 201, "Distance to 2 should be 201 via path over 1");
+    }
+
+    #[test]
+    fn inv_shortest_paths_works() {
+        let graph = inv_valid_weighted();
+        let map = graph.inv_shortest_paths(0);
+
+        assert_eq!(
+            map[&0],
+            Some((Solution::from_nodes(vec![0]), 0)),
+            "0 is the start node"
+        );
+        assert_eq!(
+            map[&1],
+            Some((Solution::from_nodes(vec![1, 0]), 100)),
+            "1 should have a direct path to 0 with length 100"
+        );
+        assert_eq!(
+            map[&2],
+            Some((Solution::from_nodes(vec![2, 1, 0]), 201)),
+            "2 should go via 1 and have length 201"
+        );
+    }
+
     #[bench]
     fn bench_iter_edge_ids(b: &mut Bencher) {
         let graph = valid_weighted();
@@ -1409,6 +1725,23 @@ mod geopoint_indexed_tests {
                 ((p2, p3), 101),
                 ((p3, p2), 50),
                 ((p3, p1), 200),
+            ],
+        )
+        .unwrap()
+    }
+
+    fn inv_valid_weighted() -> MatrixGraph<GeoPoint, usize, usize> {
+        let p1 = GeoPoint::from_degrees(12.7, 21.8);
+        let p2 = GeoPoint::from_degrees(9.7, 12.5);
+        let p3 = GeoPoint::from_degrees(11.1, 32.5);
+
+        MatrixGraph::new(
+            vec![(p1, 12), (p2, 21), (p3, 7)],
+            vec![
+                ((p2, p1), 100),
+                ((p3, p2), 101),
+                ((p2, p3), 50),
+                ((p1, p3), 200),
             ],
         )
         .unwrap()
@@ -1867,6 +2200,56 @@ mod geopoint_indexed_tests {
         assert!(
             !graph.has_edge((p1, p2)),
             "Multiple deletions should not insert the edge back."
+        );
+    }
+
+    #[test]
+    fn shortest_paths_works() {
+        let graph = valid_weighted();
+        let p1 = GeoPoint::from_degrees(12.7, 21.8);
+        let p2 = GeoPoint::from_degrees(9.7, 12.5);
+        let p3 = GeoPoint::from_degrees(11.1, 32.5);
+        let map = graph.shortest_paths(p1);
+
+        assert_eq!(
+            map[&p1],
+            Some((Solution::from_nodes(vec![p1]), 0)),
+            "0 is the start node"
+        );
+        assert_eq!(
+            map[&p2],
+            Some((Solution::from_nodes(vec![p1, p2]), 100)),
+            "1 should have a direct path to 0 with length 100"
+        );
+        assert_eq!(
+            map[&p3],
+            Some((Solution::from_nodes(vec![p1, p2, p3]), 201)),
+            "2 should go via 1 and have length 201"
+        );
+    }
+
+    #[test]
+    fn internal_inv_shortest_path_works() {
+        let p1 = GeoPoint::from_degrees(12.7, 21.8);
+        let p2 = GeoPoint::from_degrees(9.7, 12.5);
+        let p3 = GeoPoint::from_degrees(11.1, 32.5);
+        let graph = inv_valid_weighted();
+        let map = graph.inv_shortest_paths(p1);
+
+        assert_eq!(
+            map[&p1],
+            Some((Solution::from_nodes(vec![p1]), 0)),
+            "0 is the start node"
+        );
+        assert_eq!(
+            map[&p2],
+            Some((Solution::from_nodes(vec![p2, p1]), 100)),
+            "1 should have a direct path to 0 with length 100"
+        );
+        assert_eq!(
+            map[&p3],
+            Some((Solution::from_nodes(vec![p3, p2, p1]), 201)),
+            "2 should go via 1 and have length 201"
         );
     }
 }

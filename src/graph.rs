@@ -143,11 +143,17 @@ pub trait GenericWeightedGraph {
         weight: Self::EdgeWeightType,
     ) -> Result<(), GraphError<Self::IndexType>>;
 
-    /// Calculates the shortest path to the given node from all other nodes.
+    /// Calculates the shortest path from the given node to all other nodes.
     fn shortest_paths(
         &self,
+        from_node: Self::IndexType,
+    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Self::EdgeWeightType)>>;
+
+    /// Calculates the shortest path to the given node from all other nodes.
+    fn inv_shortest_paths(
+        &self,
         to_node: Self::IndexType,
-    ) -> HashMap<Self::IndexType, Solution<Self::IndexType>>;
+    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Self::EdgeWeightType)>>;
 }
 
 pub trait WeightedGraph: GenericWeightedGraph<IndexType = usize> {}
