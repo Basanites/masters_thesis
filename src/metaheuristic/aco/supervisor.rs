@@ -16,7 +16,6 @@ pub struct Supervisor<W: Write, Nw: Serialize + Sized, Ew: Serialize + Sized> {
     pub sender: Sender<aco::Message<Nw, Ew>>,
     receiver: Receiver<aco::Message<Nw, Ew>>,
     ants: usize,
-    iteration: usize,
     messages: HashMap<usize, Vec<MessageInfo<Nw, Ew>>>,
     counters: HashMap<usize, usize>,
     aggregation_rate: usize,
@@ -35,7 +34,6 @@ where
             sender: tx,
             receiver: rx,
             ants: 0,
-            iteration: 0,
             messages: HashMap::default(),
             counters: HashMap::default(),
             aggregation_rate,
@@ -111,7 +109,6 @@ where
         let (tx, rx) = mpsc::channel();
         self.sender = tx;
         self.receiver = rx;
-        self.iteration = 0;
     }
 }
 
@@ -134,7 +131,6 @@ where
             sender: tx,
             receiver: rx,
             ants: 0,
-            iteration: 0,
             messages: HashMap::default(),
             counters: HashMap::default(),
             aggregation_rate: 1,

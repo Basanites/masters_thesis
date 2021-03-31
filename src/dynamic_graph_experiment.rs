@@ -72,9 +72,9 @@ impl DynamicGraphExperiment {
             let mut nw_gen = || {
                 let mut rng = rc.borrow_mut();
                 if rng.rand_float() < grid.node_weight_probability {
-                    R64::from_inner(rng.rand_float() * nw_delta + grid.nw_range.0 + f64::small())
+                    R64::from_inner(rng.rand_float() * nw_delta + grid.nw_range.0)
                 } else {
-                    R64::small()
+                    R64::zero()
                 }
             };
             let ew_delta = grid.ew_range.1 - grid.ew_range.0;
@@ -164,6 +164,7 @@ impl DynamicGraphExperiment {
 
         let mut ew_gen = ew_generator;
         if let Ok(aco_cfg) = config.algorithm.aco() {
+            let mut inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
             let params = aco::Params::new(
                 heuristic,
                 aco_cfg.alpha,
@@ -171,15 +172,14 @@ impl DynamicGraphExperiment {
                 aco_cfg.rho,
                 Some(aco_cfg.seed as u128),
                 aco_cfg.ant_count,
+                inv_shortest_paths,
             );
             let supervisor =
                 aco::Supervisor::new(experiment_cfg.aggregation_rate, Writer::from_writer(fw));
             let mut aco_algo = Aco::new(instance, params, supervisor);
 
-            let mut i = 0;
-            for j in 0..100 {
+            for i in 0..100 {
                 println!("i {}", i);
-                aco_algo.single_iteration();
                 if i % dynamics_cfg.change_after_i == 0 {
                     change_graph(
                         &graph_rc,
@@ -193,8 +193,11 @@ impl DynamicGraphExperiment {
                         &mut o_nodes,
                         &mut o_edges,
                     );
+
+                    inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
+                    aco_algo.set_inv_shortest_paths(inv_shortest_paths)
                 }
-                i += 1;
+                aco_algo.single_iteration();
             }
             aco_algo.supervisor.aggregate_receive();
         } else if config.algorithm.two_swap().is_ok() {

@@ -1,5 +1,7 @@
-use crate::metaheuristic::Heuristic;
+use crate::metaheuristic::{Heuristic, Solution};
 use crate::rng::os_random_seed;
+
+use std::collections::HashMap;
 
 pub struct Params<'a, IndexType, Nw, Ew> {
     pub heuristic: &'a Heuristic<IndexType, Nw, Ew>,
@@ -8,6 +10,7 @@ pub struct Params<'a, IndexType, Nw, Ew> {
     pub rho: f64,
     pub seed: u128,
     pub ant_count: usize,
+    pub inv_shortest_paths: HashMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
 }
 
 impl<'a, IndexType, Nw, Ew> Params<'a, IndexType, Nw, Ew> {
@@ -18,6 +21,7 @@ impl<'a, IndexType, Nw, Ew> Params<'a, IndexType, Nw, Ew> {
         rho: f64,
         seed: Option<u128>,
         ant_count: usize,
+        inv_shortest_paths: HashMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
     ) -> Self {
         Params {
             heuristic,
@@ -26,6 +30,7 @@ impl<'a, IndexType, Nw, Ew> Params<'a, IndexType, Nw, Ew> {
             rho,
             seed: seed.unwrap_or_else(os_random_seed),
             ant_count,
+            inv_shortest_paths,
         }
     }
 }

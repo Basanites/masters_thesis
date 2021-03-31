@@ -32,6 +32,7 @@ where
     heuristic: &'a Heuristic<IndexType, Nw, Ew>,
     sender: Sender<Message<Nw, Ew>>,
     id: usize,
+    inv_shortest_paths: &'a HashMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
 }
 
 impl<'a, IndexType, Nw> Ant<'a, IndexType, Nw, R64>
@@ -57,6 +58,7 @@ where
         beta: f64,
         sender: Sender<Message<Nw, R64>>,
         id: usize,
+        inv_shortest_paths: &'a HashMap<IndexType, Option<(Solution<IndexType>, R64)>>,
     ) -> Self {
         Ant {
             graph,
@@ -69,6 +71,7 @@ where
             beta,
             sender,
             id,
+            inv_shortest_paths,
         }
     }
 
@@ -105,8 +108,8 @@ where
         if cond {
             self.weighted_heuristic(to, edge_weight, tail_length)
         } else {
-            self.weighted_heuristic_with_known_val(Nw::one(), to, edge_weight, tail_length)
-            // self.weighted_heuristic_with_known_val(Nw::zero(), to, edge_weight, tail_length)
+            // self.weighted_heuristic_with_known_val(Nw::one(), to, edge_weight, tail_length)
+            self.weighted_heuristic_with_known_val(Nw::zero(), to, edge_weight, tail_length)
         }
     }
 
@@ -125,45 +128,92 @@ where
         let mut goal_reached = false;
         let mut visited: HashMap<IndexType, bool> = HashMap::new();
         while !goal_reached {
-            // calculate the sums of the weighted heuristic and pheromones for all neighbors of next_node
-            let weighted_pheromone_sum = self
-                .pheromone_matrix
-                .iter_neighbors(next_node)
-                .unwrap()
-                .fold(R64::zero(), |acc, (_, weight)| {
-                    acc + R64::powf(*weight, R64::from_inner(self.alpha))
-                });
-            let weighted_heuristic_sum = self
+            let viable_candidates: Vec<_> = self
                 .graph
                 .borrow()
-                .iter_neighbors(next_node)
+                .iter_neighbor_ids(next_node)
                 .unwrap()
+                .filter(|node| {
+                    if let Some((_, weight)) = &self.inv_shortest_paths[node] {
+                        let &weight_to =
+                            self.graph.borrow().edge_weight((next_node, *node)).unwrap();
+                        if tail_length + *weight + weight_to <= self.max_time {
+                            return true;
+                        }
+                    }
+
+                    false
+                })
+                .collect();
+
+            // as soon as we have no more candidates to travel to we can just take our calculated shortest path
+            if viable_candidates.is_empty() {
+                let (mut path, distance) = self.inv_shortest_paths[&next_node].clone().unwrap();
+                solution.append(&mut path);
+                tail_length += distance;
+                goal_reached = true;
+            }
+
+            // weighted pheromone sum will be used in case we visited all neighbors of this node
+            let weighted_pheromone_sum = viable_candidates
+                .iter()
+                .map(|&id| self.pheromone_matrix.edge_weight((next_node, id)).unwrap())
+                .fold(R64::zero(), |acc, weight| {
+                    acc + R64::powf(*weight, R64::from_inner(self.alpha))
+                });
+            // the default is using the weighted sum as given by the paper
+            let mut weighted_sum = viable_candidates
+                .iter()
+                .map(|&id| {
+                    (
+                        id,
+                        *self.graph.borrow().edge_weight((next_node, id)).unwrap(),
+                        self.pheromone_matrix.edge_weight((next_node, id)).unwrap(),
+                    )
+                })
                 .inspect(|_| evals += 1) // increment evals for each call to heuristic
-                .fold(R64::zero(), |acc, (to, weight)| {
+                .fold(R64::zero(), |acc, (to, h_weight, p_weight)| {
                     acc + self.conditional_weighted_heuristic(
                         !visited.contains_key(&to),
                         to,
-                        *weight,
+                        h_weight,
                         tail_length,
-                    )
+                    ) * R64::powf(*p_weight, R64::from_inner(self.alpha))
                 });
+
+            let mut visited_all_viable = false;
+            if weighted_sum == R64::zero() {
+                weighted_sum = weighted_pheromone_sum;
+                visited_all_viable = true;
+            }
 
             // as soon, as we reach a point where the sum of the weighted pheromones and heuristic
             // is equal to the random number, we have hit the value with the correct probability
             // according to the formula at https://en.wikipedia.org/wiki/Ant_colony_optimization_algorithms#Edge_selection
-            let rand =
-                R64::from_inner(rng.rand_float()) * weighted_heuristic_sum * weighted_pheromone_sum;
+            let rand = R64::from_inner(rng.rand_float()) * weighted_sum;
+
+            // println!(
+            //     "there are {} viable candidates for {} with a sum of {}, a random value {} and we have visited all? {}",
+            //     viable_candidates.len(),
+            //     next_node,
+            //     weighted_sum,
+            //     rand,
+            //     visited_all_viable
+            // );
             let mut sum = R64::zero();
-            for (id, pheromone_level) in self.pheromone_matrix.iter_neighbors(next_node).unwrap() {
-                // the edge weight we want to use for the heuristic needs to be got from the distance graph,
-                // not the pheromone graph, so we have to get it from there specifically
+            for &id in viable_candidates.iter() {
+                let pheromone_level = self.pheromone_matrix.edge_weight((next_node, id)).unwrap();
                 let distance = *self.graph.borrow().edge_weight((next_node, id)).unwrap();
-                let weighted_heuristic = self.conditional_weighted_heuristic(
-                    !visited.contains_key(&id),
-                    id,
-                    distance,
-                    tail_length,
-                );
+                let weighted_heuristic = if !visited_all_viable {
+                    self.conditional_weighted_heuristic(
+                        !visited.contains_key(&id),
+                        id,
+                        distance,
+                        tail_length,
+                    )
+                } else {
+                    R64::one()
+                };
                 sum +=
                     weighted_heuristic * R64::powf(*pheromone_level, R64::from_inner(self.alpha));
                 evals += 1;

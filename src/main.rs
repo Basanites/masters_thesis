@@ -16,6 +16,7 @@ use geo::GeoPoint;
 
 use decorum::R64;
 use glob::glob;
+use num_traits::{One, Zero};
 use std::fs::{create_dir, write, File};
 use std::io::ErrorKind;
 
@@ -31,11 +32,16 @@ fn two_swap_h2<IndexType>(nw: R64, ew: R64, _id: IndexType, _elapsed: R64) -> R6
 }
 
 fn aco_h1<IndexType>(nw: R64, _ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
-    nw
+    if nw != R64::zero() {
+        R64::one() - R64::one() / nw
+    } else {
+        R64::zero()
+    }
 }
 
 fn aco_h2<IndexType>(nw: R64, ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
-    nw / ew
+    println!("{}", R64::one() - R64::one() / (nw / ew));
+    R64::one() - R64::one() / (nw / ew)
 }
 
 fn main() {

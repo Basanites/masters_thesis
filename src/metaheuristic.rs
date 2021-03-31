@@ -4,9 +4,7 @@ pub mod supervisor;
 pub mod two_swap;
 
 pub use aco::Aco;
-pub use solution::{
-    solution_length, solution_score, solution_score_and_length, Solution, SolutionError,
-};
+pub use solution::{solution_length, solution_score, Solution, SolutionError};
 pub use two_swap::TwoSwap;
 
 use decorum::R64;

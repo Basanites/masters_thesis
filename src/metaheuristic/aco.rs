@@ -10,17 +10,18 @@ pub use supervisor::Supervisor;
 
 use crate::graph::{GenericWeightedGraph, MatrixGraph};
 use crate::metaheuristic::{
-    solution_score_and_length, Heuristic, Metaheuristic, ProblemInstance, Solution,
+    solution_length, solution_score, Heuristic, Metaheuristic, ProblemInstance, Solution,
 };
 use crate::rng::rng64;
 use crate::util::SmallVal;
 
 use decorum::R64;
-use num_traits::identities::Zero;
+use num_traits::identities::{One, Zero};
 use oorandom::Rand64;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::io::Write;
@@ -51,6 +52,7 @@ where
     best_length: Ew,
     pub supervisor: Supervisor<W, Nw, Ew>,
     rng: Rand64,
+    inv_shortest_paths: HashMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
 }
 
 impl<'a, IndexType, Nw, W> Aco<'a, IndexType, Nw, R64, W>
@@ -59,23 +61,40 @@ where
     Nw: Copy + Zero + PartialOrd + Serialize + SmallVal,
     W: Write,
 {
-    fn pheromone_update(&mut self, solution: &Solution<IndexType>, solution_length: R64) {
-        let to_add = R64::from_inner(self.q) / solution_length;
-        println!("adding {}", to_add);
+    fn pheromone_update(&mut self, solution: &Solution<IndexType>, solution_score: R64) {
+        // let to_add = R64::one() - R64::from_inner(self.q) / solution_score;
+        // println!("adding {}", to_add);
 
+        let mut evaporated_pheromones = R64::zero();
+        // pheromone decay
         for edge in self.pheromone_matrix.edge_ids() {
             let weight = *self.pheromone_matrix.edge_weight(edge).unwrap();
-            let _res = self
-                .pheromone_matrix
-                .change_edge(edge, R64::from_inner(1.0 - self.rho) * weight);
+            let after_decay = R64::from_inner(1.0 - self.rho) * weight;
+            evaporated_pheromones += weight - after_decay;
+            let _res = self.pheromone_matrix.change_edge(edge, after_decay);
         }
 
-        for (from, to) in solution.iter_edges() {
+        // println!(
+        //     "evaporated {} and have {} nodes in new solution. This would lead to {} being added.",
+        //     evaporated_pheromones,
+        //     solution.unique_edges().len(),
+        //     evaporated_pheromones / R64::from_inner(solution.unique_edges().len() as f64)
+        // );
+        let to_add = evaporated_pheromones / R64::from_inner(solution.unique_edges().len() as f64);
+        // adding best solution
+        for (from, to) in solution.iter_unique_edges() {
             let weight = *self.pheromone_matrix.edge_weight((*from, *to)).unwrap();
             let _res = self
                 .pheromone_matrix
                 .change_edge((*from, *to), weight + to_add);
         }
+    }
+
+    pub fn set_inv_shortest_paths(
+        &mut self,
+        inv_shortest_paths: HashMap<IndexType, Option<(Solution<IndexType>, R64)>>,
+    ) {
+        self.inv_shortest_paths = inv_shortest_paths
     }
 }
 
@@ -111,13 +130,14 @@ where
             alpha: params.alpha,
             beta: params.beta,
             rho: params.rho,
-            q: 100.0,
+            q: 1.0,
             ant_count: params.ant_count,
             best_solution: Solution::new(),
             best_score: R64::zero(),
             best_length: R64::zero(),
             supervisor,
             rng: rng64(params.seed),
+            inv_shortest_paths: params.inv_shortest_paths,
         }
     }
 
@@ -136,6 +156,7 @@ where
                 self.beta,
                 sender,
                 id,
+                &self.inv_shortest_paths,
             ));
         }
 
@@ -150,7 +171,9 @@ where
         let mut best_solution = Solution::new();
         let mut improvements = 0;
         for solution in solutions.into_iter() {
-            if let Ok((score, length)) = solution_score_and_length(&solution, self.graph) {
+            let score_cont = solution_score(&solution, self.graph, self.heuristic);
+            let length_cont = solution_length(&solution, self.graph);
+            if let (Ok(score), Ok(length)) = (score_cont, length_cont) {
                 if length <= self.max_time && score > best_score {
                     improvements += 1;
                     best_score = score;
@@ -167,12 +190,8 @@ where
         for node in best_solution.iter_unique_nodes() {
             visited_nodes += 1;
             if let Ok(weight) = g_borrow.node_weight(node) {
-                // because we compare only for values being greater than the small val, this could lead to problems.
-                // it is done this way to avoid intensive calculations for absolute float comparison.
-                if *weight > R64::small() {
-                    visited_with_val += 1;
-                    val_sum += *weight - R64::small();
-                }
+                visited_with_val += 1;
+                val_sum += *weight;
             }
         }
 
@@ -192,16 +211,21 @@ where
             val_sum,
         )); // Ant 0 is always supervisor
         self.supervisor.prepare_next();
+
+        self.pheromone_update(&best_solution, best_score);
         if best_score > self.best_score {
             println!("solution improved");
-            self.pheromone_update(&best_solution, best_length);
             self.best_solution = best_solution;
             self.best_score = best_score;
             self.best_length = best_length;
 
             return Some(&self.best_solution);
+        } else if best_length < self.best_length && best_score == self.best_score {
+            println!("solution length improved");
+            self.best_solution = best_solution;
+            self.best_score = best_score;
+            self.best_length = best_length;
         }
-
         None
     }
 }

@@ -512,6 +512,20 @@ mod tests {
     use super::*;
     use crate::graph::MatrixGraph;
     use crate::metaheuristic::Metaheuristic;
+    use csv::Writer;
+    use std::io::{Error, Write};
+    use std::result::Result;
+
+    struct Blind {}
+    impl Write for Blind {
+        fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+            Ok(0)
+        }
+
+        fn flush(&mut self) -> Result<(), Error> {
+            Ok(())
+        }
+    }
 
     fn nw(n: R64, _: R64, _: usize, _: R64) -> R64 {
         n
@@ -545,13 +559,17 @@ mod tests {
         .unwrap()
     }
 
+    fn blind_supervisor() -> Supervisor<Blind, R64, R64> {
+        Supervisor::new(1, Writer::from_writer(Blind {}))
+    }
+
     #[test]
     fn initialization_works() {
         let graph = RefCell::new(weighted_graph());
         let optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, R64::from_inner(100.0)),
             Params::new(&nw),
-            Supervisor::default(),
+            blind_supervisor(),
         );
         let solution = optimizer.current_solution();
         let correct = Solution::from_edges(vec![(0, 3), (3, 0)]).unwrap();
@@ -565,7 +583,7 @@ mod tests {
         let mut optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, R64::from_inner(100.0)),
             Params::new(&nw),
-            Supervisor::default(),
+            blind_supervisor(),
         );
         let _ = optimizer.single_iteration();
         let solution = optimizer.current_solution();
@@ -581,7 +599,7 @@ mod tests {
         let mut optimizer = TwoSwap::new(
             ProblemInstance::new(&graph, 0, R64::from_inner(100.0)),
             Params::new(&nw),
-            Supervisor::default(),
+            blind_supervisor(),
         );
         optimizer.solve();
         let solution = optimizer.current_solution();
