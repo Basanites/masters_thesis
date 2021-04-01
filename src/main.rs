@@ -40,8 +40,12 @@ fn aco_h1<IndexType>(nw: R64, _ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
 }
 
 fn aco_h2<IndexType>(nw: R64, ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
-    println!("{}", R64::one() - R64::one() / (nw / ew));
-    R64::one() - R64::one() / (nw / ew)
+    if nw != R64::zero() && ew != R64::zero() {
+        // R64::one() - R64::one() / (nw / ew)
+        nw / ew
+    } else {
+        R64::zero()
+    }
 }
 
 fn main() {

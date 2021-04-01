@@ -116,7 +116,6 @@ where
     pub fn get_solution(&self) -> Solution<IndexType> {
         let start_time = Instant::now();
         let mut evals = 0;
-        let mut n_improvements = 0;
         let mut changes = 0;
         let mut score = R64::zero();
         let mut rng = rng64(self.rng_seed);
@@ -148,9 +147,12 @@ where
 
             // as soon as we have no more candidates to travel to we can just take our calculated shortest path
             if viable_candidates.is_empty() {
-                let (mut path, distance) = self.inv_shortest_paths[&next_node].clone().unwrap();
-                solution.append(&mut path);
-                tail_length += distance;
+                // if we added the path even when we have reached the goal point we get it twice at the end of the solution
+                if next_node != self.goal_point {
+                    let (mut path, distance) = self.inv_shortest_paths[&next_node].clone().unwrap();
+                    solution.append(&mut path);
+                    tail_length += distance;
+                }
                 goal_reached = true;
             }
 
@@ -223,11 +225,12 @@ where
                 if sum >= rand {
                     solution.push_node(id);
                     tail_length += distance;
+                    score += weighted_heuristic;
                     visited.insert(id, true);
                     changes += 1;
-                    if id == self.goal_point {
-                        goal_reached = true;
-                    }
+                    // if id == self.goal_point {
+                    //     goal_reached = true;
+                    // }
                     next_node = id;
                     break;
                 }
@@ -251,7 +254,7 @@ where
             self.id,
             0,
             evals,
-            n_improvements,
+            0,
             changes,
             0,
             start_time.elapsed(),

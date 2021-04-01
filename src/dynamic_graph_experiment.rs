@@ -179,24 +179,24 @@ impl DynamicGraphExperiment {
             let mut aco_algo = Aco::new(instance, params, supervisor);
 
             for i in 0..100 {
-                println!("i {}", i);
-                if i % dynamics_cfg.change_after_i == 0 {
-                    change_graph(
-                        &graph_rc,
-                        &config.graph_dynamics,
-                        &mut dyn_rng,
-                        nw_generator,
-                        match ew_gen {
-                            Some(ref mut gen) => Some(gen),
-                            _ => None,
-                        },
-                        &mut o_nodes,
-                        &mut o_edges,
-                    );
+                println!("i = {}", i);
+                // if i % dynamics_cfg.change_after_i == 0 {
+                //     change_graph(
+                //         &graph_rc,
+                //         &config.graph_dynamics,
+                //         &mut dyn_rng,
+                //         nw_generator,
+                //         match ew_gen {
+                //             Some(ref mut gen) => Some(gen),
+                //             _ => None,
+                //         },
+                //         &mut o_nodes,
+                //         &mut o_edges,
+                //     );
 
-                    inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
-                    aco_algo.set_inv_shortest_paths(inv_shortest_paths)
-                }
+                //     inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
+                //     aco_algo.set_inv_shortest_paths(inv_shortest_paths)
+                // }
                 aco_algo.single_iteration();
             }
             aco_algo.supervisor.aggregate_receive();
@@ -208,20 +208,21 @@ impl DynamicGraphExperiment {
 
             let mut i = 0;
             while two_swap_algo.single_iteration().is_some() {
-                if i % dynamics_cfg.change_after_i == 0 {
-                    change_graph(
-                        &graph_rc,
-                        &config.graph_dynamics,
-                        &mut dyn_rng,
-                        nw_generator,
-                        match ew_gen {
-                            Some(ref mut gen) => Some(gen),
-                            _ => None,
-                        },
-                        &mut o_nodes,
-                        &mut o_edges,
-                    );
-                }
+                println!("i = {}", i);
+                // if i % dynamics_cfg.change_after_i == 0 {
+                //     change_graph(
+                //         &graph_rc,
+                //         &config.graph_dynamics,
+                //         &mut dyn_rng,
+                //         nw_generator,
+                //         match ew_gen {
+                //             Some(ref mut gen) => Some(gen),
+                //             _ => None,
+                //         },
+                //         &mut o_nodes,
+                //         &mut o_edges,
+                //     );
+                // }
                 i += 1;
             }
             two_swap_algo.supervisor.aggregate_receive();
