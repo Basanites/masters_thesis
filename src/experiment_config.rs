@@ -117,6 +117,7 @@ pub struct ExperimentConfig {
 pub enum ExperimentConfigError {
     NotAco,
     NotTwoSwap,
+    NotRandom,
     InvalidAlgorithmConfig(String),
     NotFileBased,
     NotGrid,
@@ -129,6 +130,7 @@ impl fmt::Display for ExperimentConfigError {
         match self {
             Self::NotAco => write!(f, "Config is not a valid ACO config."),
             Self::NotTwoSwap => write!(f, "Config is not a valid TwoSwap config."),
+            Self::NotRandom => write!(f, "Config is not a valid RandomSearch config."),
             Self::InvalidAlgorithmConfig(msg) => write!(f, "{}", msg),
             Self::NotFileBased => write!(f, "Config is not a valid file import config."),
             Self::NotGrid => write!(f, "Config is not a valid generation config."),

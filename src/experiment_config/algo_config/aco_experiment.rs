@@ -10,6 +10,7 @@ pub struct AcoExperiment {
     pub rho: f64,
     pub seed: u64,
     pub ant_count: usize,
+    pub iterations: usize,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -18,6 +19,7 @@ pub struct UnseededAcoExperiment {
     pub beta: f64,
     pub rho: f64,
     pub ant_count: usize,
+    pub iterations: usize,
 }
 
 impl Fix<AcoExperiment> for UnseededAcoExperiment {
@@ -28,6 +30,7 @@ impl Fix<AcoExperiment> for UnseededAcoExperiment {
             rho: self.rho,
             ant_count: self.ant_count,
             seed: (os_random_seed() >> 64) as u64,
+            iterations: self.iterations,
         }
     }
 }

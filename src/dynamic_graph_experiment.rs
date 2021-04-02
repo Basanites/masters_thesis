@@ -14,7 +14,8 @@ use crate::graph::generate::{ErdosRenyi, Generate, Grid};
 use crate::graph::import::{import_pbf, ImportError};
 use crate::graph::{Edge, GenericWeightedGraph, MatrixGraph};
 use crate::metaheuristic::{
-    aco, two_swap, Aco, Heuristic, Metaheuristic, ProblemInstance, TwoSwap,
+    aco, random_search, two_swap, Aco, Heuristic, Metaheuristic, ProblemInstance, RandomSearch,
+    TwoSwap,
 };
 use crate::rng::rng64;
 use crate::util::SmallVal;
@@ -164,7 +165,7 @@ impl DynamicGraphExperiment {
 
         let mut ew_gen = ew_generator;
         if let Ok(aco_cfg) = config.algorithm.aco() {
-            let mut inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
+            let inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
             let params = aco::Params::new(
                 heuristic,
                 aco_cfg.alpha,
@@ -178,7 +179,7 @@ impl DynamicGraphExperiment {
                 aco::Supervisor::new(experiment_cfg.aggregation_rate, Writer::from_writer(fw));
             let mut aco_algo = Aco::new(instance, params, supervisor);
 
-            for i in 0..100 {
+            for i in 0..aco_cfg.iterations {
                 println!("i = {}", i);
                 // if i % dynamics_cfg.change_after_i == 0 {
                 //     change_graph(
@@ -226,6 +227,20 @@ impl DynamicGraphExperiment {
                 i += 1;
             }
             two_swap_algo.supervisor.aggregate_receive();
+        } else if let Ok(random_cfg) = config.algorithm.random() {
+            let inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
+            let params =
+                random_search::Params::new(heuristic, &inv_shortest_paths, random_cfg.seed as u128);
+            let supervisor = random_search::Supervisor::new(
+                experiment_cfg.aggregation_rate,
+                Writer::from_writer(fw),
+            );
+            let mut random_algo = RandomSearch::new(instance, params, supervisor);
+            for i in 0..random_cfg.iterations {
+                println!("i = {}", i);
+                random_algo.single_iteration();
+            }
+            random_algo.supervisor.aggregate_receive();
         } else {
             return Err(ExperimentConfigError::InvalidGraphConfig(
                 "No valid Algorithm config supplied.".to_string(),

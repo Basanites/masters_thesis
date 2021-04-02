@@ -1,9 +1,11 @@
 pub mod aco;
+pub mod random_search;
 mod solution;
 pub mod supervisor;
 pub mod two_swap;
 
 pub use aco::Aco;
+pub use random_search::RandomSearch;
 pub use solution::{solution_length, solution_score, Solution, SolutionError};
 pub use two_swap::TwoSwap;
 

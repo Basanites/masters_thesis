@@ -1,0 +1,32 @@
+---
+experiment:
+  finished: false
+  seed: 9950194303167767779
+  aggregation_rate: 1
+  max_time: 500.0
+algorithm:
+  alpha: 1.0
+  beta: 5.0
+  rho: 0.2
+  seed: 9587238234811987918
+  ant_count: 20
+  iterations: 100
+graph_creation:
+  seed: 16212577187121195229
+  size:
+    - 10
+    - 10
+  nw_range:
+    - 10.0
+    - 20.0
+  ew_range:
+    - 2.0
+    - 5.0
+  node_weight_probability: 0.2
+graph_dynamics:
+  seed: 7643730895593078020
+  change_after_i: 1000
+  edge_change_probability: 0.2
+  node_change_probability: 0.2
+  edge_change_intensity: 1.0
+  node_change_intensity: 2.0
