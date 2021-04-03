@@ -214,14 +214,14 @@ where
 
         self.pheromone_update(&best_solution, best_score);
         if best_score > self.best_score {
-            println!("solution improved");
+            // println!("solution improved");
             self.best_solution = best_solution;
             self.best_score = best_score;
             self.best_length = best_length;
 
             return Some(&self.best_solution);
         } else if best_length < self.best_length && best_score == self.best_score {
-            println!("solution length improved");
+            // println!("solution length improved");
             self.best_solution = best_solution;
             self.best_score = best_score;
             self.best_length = best_length;

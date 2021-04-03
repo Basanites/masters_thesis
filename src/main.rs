@@ -69,7 +69,8 @@ fn main() {
         let path = entry.unwrap();
         let entry = path.as_path();
         let stem = entry.file_stem().unwrap().to_str().unwrap();
-        println!("Running Config {}: ", stem);
+        println!("\n---------------------------------------------------");
+        println!("Running config {}: ", stem);
         // create directory for logging.
         // errors if exists, but we don't care about that.
         let res = create_dir(format!("{}/{}", experiment_location, stem).as_str());
@@ -135,6 +136,7 @@ fn main() {
         if experiment.algorithm.two_swap().is_ok() {
             if experiment.graph_creation.file().is_ok() {
                 for (heuristic, name) in two_swap_functions_geo.iter() {
+                    println!("Running heuristic {}", name);
                     let filename = format!("{}/{}.csv", log_folder.to_str().unwrap(), name);
                     let res = DynamicGraphExperiment::run_geopoint_config(
                         &experiment,
@@ -147,6 +149,7 @@ fn main() {
                 }
             } else {
                 for (heuristic, name) in two_swap_functions_usize.iter() {
+                    println!("Running heuristic {}", name);
                     let filename = format!("{}/{}.csv", log_folder.to_str().unwrap(), name);
                     let res = DynamicGraphExperiment::run_usize_config(
                         &experiment,
@@ -161,6 +164,7 @@ fn main() {
         } else if experiment.algorithm.aco().is_ok() {
             if experiment.graph_creation.file().is_ok() {
                 for (heuristic, name) in aco_functions_geo.iter() {
+                    println!("Running heuristic {}", name);
                     let filename = format!("{}/{}.csv", log_folder.to_str().unwrap(), name);
                     let res = DynamicGraphExperiment::run_geopoint_config(
                         &experiment,
@@ -173,6 +177,7 @@ fn main() {
                 }
             } else {
                 for (heuristic, name) in aco_functions_usize.iter() {
+                    println!("Running heuristic {}", name);
                     let filename = format!("{}/{}.csv", log_folder.to_str().unwrap(), name);
                     let res = DynamicGraphExperiment::run_usize_config(
                         &experiment,
@@ -187,6 +192,7 @@ fn main() {
         } else if experiment.algorithm.random().is_ok() {
             if experiment.graph_creation.file().is_ok() {
                 for (heuristic, name) in random_functions_geo.iter() {
+                    println!("Running heuristic {}", name);
                     let filename = format!("{}/{}.csv", log_folder.to_str().unwrap(), name);
                     let res = DynamicGraphExperiment::run_geopoint_config(
                         &experiment,
@@ -199,6 +205,7 @@ fn main() {
                 }
             } else {
                 for (heuristic, name) in random_functions_usize.iter() {
+                    println!("Running heuristic {}", name);
                     let filename = format!("{}/{}.csv", log_folder.to_str().unwrap(), name);
                     let res = DynamicGraphExperiment::run_usize_config(
                         &experiment,

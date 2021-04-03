@@ -1,5 +1,6 @@
 use csv::Writer;
 use decorum::R64;
+use indicatif::ProgressIterator;
 use num_traits::Zero;
 use oorandom::Rand64;
 use std::cell::RefCell;
@@ -179,8 +180,7 @@ impl DynamicGraphExperiment {
                 aco::Supervisor::new(experiment_cfg.aggregation_rate, Writer::from_writer(fw));
             let mut aco_algo = Aco::new(instance, params, supervisor);
 
-            for i in 0..aco_cfg.iterations {
-                println!("i = {}", i);
+            for _ in (0..aco_cfg.iterations).progress() {
                 // if i % dynamics_cfg.change_after_i == 0 {
                 //     change_graph(
                 //         &graph_rc,
@@ -209,7 +209,6 @@ impl DynamicGraphExperiment {
 
             let mut i = 0;
             while two_swap_algo.single_iteration().is_some() {
-                println!("i = {}", i);
                 // if i % dynamics_cfg.change_after_i == 0 {
                 //     change_graph(
                 //         &graph_rc,
@@ -226,6 +225,7 @@ impl DynamicGraphExperiment {
                 // }
                 i += 1;
             }
+            println!("Took {} iterations", i);
             two_swap_algo.supervisor.aggregate_receive();
         } else if let Ok(random_cfg) = config.algorithm.random() {
             let inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
@@ -236,8 +236,7 @@ impl DynamicGraphExperiment {
                 Writer::from_writer(fw),
             );
             let mut random_algo = RandomSearch::new(instance, params, supervisor);
-            for i in 0..random_cfg.iterations {
-                println!("i = {}", i);
+            for _ in (0..random_cfg.iterations).progress() {
                 random_algo.single_iteration();
             }
             random_algo.supervisor.aggregate_receive();
