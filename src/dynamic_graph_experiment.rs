@@ -34,10 +34,21 @@ impl DynamicGraphExperiment {
         }
 
         if let Ok(f) = config.graph_creation.file() {
+            let is_two_swap = config.algorithm.two_swap().is_ok();
             let mut rng = rng64(f.seed as u128);
-            let delta = f.nw_range.1 - f.nw_range.0;
-            let mut value_gen = || R64::from_inner(rng.rand_float() * delta + f.nw_range.0);
-            let pbf = import_pbf(f.filename.as_str(), &mut value_gen);
+            let nw_delta = f.nw_range.1 - f.nw_range.0;
+            let mut nw_gen = || {
+                if rng.rand_float() < f.node_weight_probability && !is_two_swap {
+                    R64::from_inner(rng.rand_float() * nw_delta + f.nw_range.0)
+                } else if rng.rand_float() < f.node_weight_probability && is_two_swap {
+                    R64::from_inner(rng.rand_float() * nw_delta + f.nw_range.0) + R64::small()
+                } else if is_two_swap {
+                    R64::small()
+                } else {
+                    R64::zero()
+                }
+            };
+            let pbf = import_pbf(f.filename.as_str(), &mut nw_gen);
             match pbf {
                 Err(ImportError::MissingFile(msg)) => {
                     Err(ExperimentConfigError::InvalidGraphConfig(msg))
@@ -47,7 +58,7 @@ impl DynamicGraphExperiment {
                     heuristic,
                     graph,
                     filename,
-                    &mut value_gen,
+                    &mut nw_gen,
                     None,
                 ),
                 _ => panic!("pbf import threw an undefined error"),
@@ -69,12 +80,17 @@ impl DynamicGraphExperiment {
         }
 
         if let Ok(grid) = config.graph_creation.grid() {
+            let is_two_swap = config.algorithm.two_swap().is_ok();
             let rc = RefCell::new(rng64(grid.seed as u128));
             let nw_delta = grid.nw_range.1 - grid.nw_range.0;
             let mut nw_gen = || {
                 let mut rng = rc.borrow_mut();
-                if rng.rand_float() < grid.node_weight_probability {
+                if rng.rand_float() < grid.node_weight_probability && !is_two_swap {
                     R64::from_inner(rng.rand_float() * nw_delta + grid.nw_range.0)
+                } else if rng.rand_float() < grid.node_weight_probability && is_two_swap {
+                    R64::from_inner(rng.rand_float() * nw_delta + grid.nw_range.0) + R64::small()
+                } else if is_two_swap {
+                    R64::small()
                 } else {
                     R64::zero()
                 }

@@ -7,7 +7,7 @@ pub use params::Params;
 pub use supervisor::Supervisor;
 
 use crate::graph::GenericWeightedGraph;
-use crate::metaheuristic::{solution_length, Heuristic, Metaheuristic, ProblemInstance, Solution};
+use crate::metaheuristic::{Heuristic, Metaheuristic, ProblemInstance, Solution};
 use crate::rng::rng64;
 
 use decorum::R64;
