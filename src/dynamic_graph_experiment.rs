@@ -171,8 +171,8 @@ impl DynamicGraphExperiment {
             .map(|(id, weight)| (id, *weight))
             .collect();
         let graph_rc = RefCell::new(graph);
-        let dynamics_cfg = config.graph_dynamics.cfg();
-        let mut dyn_rng = rng64(dynamics_cfg.seed as u128);
+        // let dynamics_cfg = config.graph_dynamics.cfg();
+        // let mut dyn_rng = rng64(dynamics_cfg.seed as u128);
         let instance = ProblemInstance::new(
             &graph_rc,
             start_node,

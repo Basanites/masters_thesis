@@ -36,7 +36,7 @@ pub struct ExperimentConfig {
     pub experiment: GeneralExperimentConfig,
     pub algorithm: AlgoConfig,
     pub graph_creation: GraphCreationConfig,
-    pub graph_dynamics: GraphDynamicsConfig,
+    // pub graph_dynamics: GraphDynamicsConfig,
 }
 
 // pub struct DynamicGraphExperiment<'a, IndexType, M>

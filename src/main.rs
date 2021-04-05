@@ -115,13 +115,13 @@ fn main() {
             );
             continue;
         };
-        let graph_dynamics_cfg = GraphDynamicsConfig::Full(experiment.graph_dynamics.cfg());
+        // let graph_dynamics_cfg = GraphDynamicsConfig::Full(experiment.graph_dynamics.cfg());
 
         // write full version to cfg for later usage
         experiment.experiment = general_cfg;
         experiment.algorithm = algo_cfg;
         experiment.graph_creation = graph_creation_cfg;
-        experiment.graph_dynamics = graph_dynamics_cfg;
+        // experiment.graph_dynamics = graph_dynamics_cfg;
         let par_string = serde_yaml::to_string(&experiment).unwrap();
         println!("{}", par_string);
         let res = write(entry, par_string.as_bytes());
