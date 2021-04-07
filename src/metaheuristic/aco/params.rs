@@ -4,7 +4,7 @@ use crate::rng::os_random_seed;
 use std::collections::HashMap;
 
 pub struct Params<'a, IndexType, Nw, Ew> {
-    pub heuristic: &'a Heuristic<IndexType, Nw, Ew>,
+    pub heuristic: &'a Heuristic<Nw, Ew>,
     pub alpha: f64,
     pub beta: f64,
     pub rho: f64,
@@ -15,7 +15,7 @@ pub struct Params<'a, IndexType, Nw, Ew> {
 
 impl<'a, IndexType, Nw, Ew> Params<'a, IndexType, Nw, Ew> {
     pub fn new(
-        heuristic: &'a Heuristic<IndexType, Nw, Ew>,
+        heuristic: &'a Heuristic<Nw, Ew>,
         alpha: f64,
         beta: f64,
         rho: f64,

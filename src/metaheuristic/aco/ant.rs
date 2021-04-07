@@ -2,6 +2,7 @@ use crate::graph::{GenericWeightedGraph, MatrixGraph};
 use crate::metaheuristic::aco::Message;
 use crate::metaheuristic::{Heuristic, Solution};
 use crate::rng::rng64;
+use crate::util::Distance;
 
 use decorum::{Real, R64};
 use num_traits::identities::{One, Zero};
@@ -29,7 +30,7 @@ where
     alpha: f64,
     beta: f64,
     rng_seed: u128,
-    heuristic: &'a Heuristic<IndexType, Nw, Ew>,
+    heuristic: &'a Heuristic<Nw, Ew>,
     sender: Sender<Message<Nw, Ew>>,
     id: usize,
     inv_shortest_paths: &'a HashMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
@@ -37,7 +38,7 @@ where
 
 impl<'a, IndexType, Nw> Ant<'a, IndexType, Nw, R64>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
+    IndexType: Distance<IndexType> + Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     Nw: Copy + Zero + One + AddAssign<Nw>,
 {
     #[allow(clippy::too_many_arguments)]
@@ -52,7 +53,7 @@ where
         pheromone_matrix: &'a MatrixGraph<IndexType, (), R64>,
         goal_point: IndexType,
         max_time: R64,
-        heuristic: &'a Heuristic<IndexType, Nw, R64>,
+        heuristic: &'a Heuristic<Nw, R64>,
         rng_seed: u128,
         alpha: f64,
         beta: f64,
@@ -92,7 +93,12 @@ where
         tail_length: R64,
     ) -> R64 {
         R64::powf(
-            (self.heuristic)(value, edge_weight, to, tail_length / self.max_time),
+            (self.heuristic)(
+                value,
+                edge_weight,
+                IndexType::distance(self.goal_point, to),
+                tail_length / self.max_time,
+            ),
             R64::from_inner(self.beta),
         )
     }

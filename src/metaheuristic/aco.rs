@@ -13,7 +13,7 @@ use crate::metaheuristic::{
     solution_length, solution_score, Heuristic, Metaheuristic, ProblemInstance, Solution,
 };
 use crate::rng::rng64;
-use crate::util::SmallVal;
+use crate::util::{Distance, SmallVal};
 
 use decorum::R64;
 use num_traits::identities::{One, Zero};
@@ -41,7 +41,7 @@ where
     pheromone_matrix: MatrixGraph<IndexType, (), R64>,
     goal_point: IndexType,
     max_time: Ew,
-    heuristic: &'a Heuristic<IndexType, Nw, Ew>,
+    heuristic: &'a Heuristic<Nw, Ew>,
     alpha: f64,
     beta: f64,
     rho: f64,
@@ -57,7 +57,7 @@ where
 
 impl<'a, IndexType, Nw, W> Aco<'a, IndexType, Nw, R64, W>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
+    IndexType: Distance<IndexType> + Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     Nw: Copy + Zero + PartialOrd + Serialize + SmallVal,
     W: Write,
 {
@@ -100,7 +100,7 @@ where
 
 impl<'a, IndexType, W> Metaheuristic<'a, IndexType, R64, R64> for Aco<'a, IndexType, R64, R64, W>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
+    IndexType: Distance<IndexType> + Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     W: Write,
 {
     type Params = Params<'a, IndexType, R64, R64>;

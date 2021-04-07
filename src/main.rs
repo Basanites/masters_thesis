@@ -12,26 +12,24 @@ use dynamic_graph_experiment::DynamicGraphExperiment;
 use experiment_config::{
     AlgoConfig, ExperimentConfig, GeneralExperimentConfig, GraphCreationConfig, GraphDynamicsConfig,
 };
-use geo::GeoPoint;
+use metaheuristic::Heuristic;
 
 use decorum::R64;
 use glob::glob;
+use num_traits::real::Real;
 use num_traits::{One, Zero};
 use std::fs::{create_dir, write, File};
 use std::io::ErrorKind;
 
-type UsizeHeuristic = dyn Fn(R64, R64, usize, R64) -> R64;
-type GeoPointHeuristic = dyn Fn(R64, R64, GeoPoint, R64) -> R64;
-
-fn two_swap_h1<IndexType>(nw: R64, _ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
+fn two_swap_h1(nw: R64, _ew: R64, _dist_to_start: R64, _elapsed: R64) -> R64 {
     nw
 }
 
-fn two_swap_h2<IndexType>(nw: R64, ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
+fn two_swap_h2(nw: R64, ew: R64, _dist_to_start: R64, _elapsed: R64) -> R64 {
     nw / ew
 }
 
-fn aco_h1<IndexType>(nw: R64, _ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
+fn aco_h1(nw: R64, _ew: R64, _dist_to_start: R64, _elapsed: R64) -> R64 {
     if nw != R64::zero() {
         R64::one() - R64::one() / nw
     } else {
@@ -39,7 +37,7 @@ fn aco_h1<IndexType>(nw: R64, _ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
     }
 }
 
-fn aco_h2<IndexType>(nw: R64, ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
+fn aco_h2(nw: R64, ew: R64, _dist_to_start: R64, _elapsed: R64) -> R64 {
     if nw != R64::zero() && ew != R64::zero() {
         // R64::one() - R64::one() / (nw / ew)
         nw / ew
@@ -48,20 +46,31 @@ fn aco_h2<IndexType>(nw: R64, ew: R64, _id: IndexType, _elapsed: R64) -> R64 {
     }
 }
 
+fn aco_h3(nw: R64, _ew: R64, dist_to_start: R64, elapsed: R64) -> R64 {
+    if nw != R64::zero() {
+        R64::powf(R64::one() - R64::one() / nw, R64::one() - elapsed)
+            * R64::powf(R64::one() / dist_to_start, elapsed)
+    } else {
+        R64::zero()
+    }
+}
+
 fn main() {
     let experiment_location = "./experiments";
-    let two_swap_functions_usize: Vec<(&UsizeHeuristic, &str)> =
+    let two_swap_functions_usize: Vec<(&Heuristic<R64, R64>, &str)> =
         vec![(&two_swap_h1, "h1"), (&two_swap_h2, "h2")];
-    let two_swap_functions_geo: Vec<(&GeoPointHeuristic, &str)> =
+    let two_swap_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> =
         vec![(&two_swap_h1, "h1"), (&two_swap_h2, "h2")];
 
-    let aco_functions_usize: Vec<(&UsizeHeuristic, &str)> = vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
-    let aco_functions_geo: Vec<(&GeoPointHeuristic, &str)> = vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
+    let aco_functions_usize: Vec<(&Heuristic<R64, R64>, &str)> =
+        vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
+    let aco_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> =
+        vec![(&aco_h1, "h1"), (&aco_h2, "h2"), (&aco_h3, "h3")];
 
-    let random_functions_usize: Vec<(&UsizeHeuristic, &str)> =
+    let random_functions_usize: Vec<(&Heuristic<R64, R64>, &str)> =
         vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
-    let random_functions_geo: Vec<(&GeoPointHeuristic, &str)> =
-        vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
+    let random_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> =
+        vec![(&aco_h1, "h1"), (&aco_h2, "h2"), (&aco_h3, "h3")];
 
     for entry in glob(format!("{}/*.yaml", experiment_location).as_str())
         .expect("Failed to read glob pattern")

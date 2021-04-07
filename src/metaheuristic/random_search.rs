@@ -9,6 +9,7 @@ pub use supervisor::Supervisor;
 use crate::graph::GenericWeightedGraph;
 use crate::metaheuristic::{Heuristic, Metaheuristic, ProblemInstance, Solution};
 use crate::rng::rng64;
+use crate::util::Distance;
 
 use decorum::R64;
 use num_traits::identities::Zero;
@@ -40,7 +41,7 @@ pub struct RandomSearch<
         >,
     >,
     goal_point: IndexType,
-    heuristic: &'a Heuristic<IndexType, NodeWeightType, EdgeWeightType>,
+    heuristic: &'a Heuristic<NodeWeightType, EdgeWeightType>,
     max_time: EdgeWeightType,
     pub best_solution: Solution<IndexType>,
     pub best_score: R64,
@@ -54,7 +55,7 @@ pub struct RandomSearch<
 impl<'a, IndexType, NodeWeightType, EdgeWeightType, W>
     RandomSearch<'a, IndexType, NodeWeightType, EdgeWeightType, W>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
+    IndexType: Distance<IndexType> + Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     NodeWeightType: Copy
         + Debug
         + Add<Output = NodeWeightType>
@@ -108,11 +109,20 @@ where
             let dist = *g_borrow.edge_weight((*from, *to)).unwrap();
             length += dist;
             if !visited.contains_key(to) {
-                heuristic_score +=
-                    (self.heuristic)(*g_borrow.node_weight(*to).unwrap(), dist, *to, length);
+                heuristic_score += (self.heuristic)(
+                    *g_borrow.node_weight(*to).unwrap(),
+                    dist,
+                    IndexType::distance(self.goal_point, *to),
+                    length,
+                );
                 visited.insert(*to, true);
             } else {
-                heuristic_score += (self.heuristic)(NodeWeightType::zero(), dist, *to, length);
+                heuristic_score += (self.heuristic)(
+                    NodeWeightType::zero(),
+                    dist,
+                    IndexType::distance(self.goal_point, *to),
+                    length,
+                );
             }
         }
 
@@ -215,7 +225,7 @@ where
 impl<'a, IndexType, Nw, Ew, W> Metaheuristic<'a, IndexType, Nw, Ew>
     for RandomSearch<'a, IndexType, Nw, Ew, W>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
+    IndexType: Distance<IndexType> + Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     Nw: Copy
         + Debug
         + Add<Output = Nw>
@@ -286,7 +296,7 @@ where
 
 impl<'a, IndexType, Nw, Ew, W> Iterator for RandomSearch<'a, IndexType, Nw, Ew, W>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
+    IndexType: Distance<IndexType> + Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     Nw: Copy
         + Debug
         + Add<Output = Nw>

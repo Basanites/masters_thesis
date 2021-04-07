@@ -1,5 +1,6 @@
 use crate::graph::{Edge, GenericWeightedGraph, GraphError};
 use crate::metaheuristic::Heuristic;
+use crate::util::Distance;
 
 use decorum::R64;
 use num_traits::identities::Zero;
@@ -23,7 +24,7 @@ pub fn solution_length<IndexType, NodeWeightType, EdgeWeightType>(
     >,
 ) -> Result<EdgeWeightType, GraphError<IndexType>>
 where
-    IndexType: PartialEq + Copy + Debug + Display + Hash + Eq,
+    IndexType: Distance<IndexType> + PartialEq + Copy + Debug + Display + Hash + Eq,
     EdgeWeightType: Sum + Copy,
 {
     for (from, to) in solution.iter_edges() {
@@ -43,13 +44,14 @@ pub fn solution_score<IndexType, Nw, Ew>(
     graph: &RefCell<
         dyn GenericWeightedGraph<IndexType = IndexType, NodeWeightType = Nw, EdgeWeightType = Ew>,
     >,
-    heuristic: &Heuristic<IndexType, Nw, Ew>,
+    heuristic: &Heuristic<Nw, Ew>,
 ) -> Result<R64, GraphError<IndexType>>
 where
-    IndexType: PartialEq + Copy + Debug + Display + Hash + Eq,
+    IndexType: Distance<IndexType> + PartialEq + Copy + Debug + Display + Hash + Eq,
     Nw: Sum + Copy + Debug + Zero + Add<Output = Nw>,
     Ew: Copy + Debug + Zero + Add<Output = Ew>,
 {
+    let start = solution.node_list[0];
     let mut visited: HashSet<IndexType> = HashSet::new();
     let mut distance_traveled = Ew::zero();
     let mut sum = R64::zero();
@@ -63,7 +65,7 @@ where
         };
 
         distance_traveled = ew + distance_traveled;
-        sum += heuristic(nw, ew, *to, distance_traveled);
+        sum += heuristic(nw, ew, IndexType::distance(start, *to), distance_traveled);
         visited.insert(*to);
     }
 

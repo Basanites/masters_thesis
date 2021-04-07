@@ -8,7 +8,7 @@ pub use supervisor::Supervisor;
 
 use crate::graph::GenericWeightedGraph;
 use crate::metaheuristic::{solution_length, Heuristic, Metaheuristic, ProblemInstance, Solution};
-use crate::util::SmallVal;
+use crate::util::{Distance, SmallVal};
 
 use decorum::R64;
 use num_traits::identities::Zero;
@@ -39,7 +39,7 @@ pub struct TwoSwap<
         >,
     >,
     goal_point: IndexType,
-    heuristic: &'a Heuristic<IndexType, NodeWeightType, EdgeWeightType>,
+    heuristic: &'a Heuristic<NodeWeightType, EdgeWeightType>,
     max_time: EdgeWeightType,
     pub best_solution: Solution<IndexType>,
     pub best_score: R64,
@@ -51,7 +51,7 @@ pub struct TwoSwap<
 impl<'a, IndexType, NodeWeightType, EdgeWeightType, W>
     TwoSwap<'a, IndexType, NodeWeightType, EdgeWeightType, W>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
+    IndexType: Distance<IndexType> + Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     NodeWeightType: Copy
         + Debug
         + Add<Output = NodeWeightType>
@@ -86,7 +86,7 @@ where
         (self.heuristic)(
             node_weight,
             edge_weight,
-            point,
+            IndexType::distance(self.goal_point, point),
             distance_up_to / self.max_time,
         )
     }
@@ -396,7 +396,7 @@ where
 impl<'a, IndexType, Nw, Ew, W> Metaheuristic<'a, IndexType, Nw, Ew>
     for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
+    IndexType: Distance<IndexType> + Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     Nw: Copy
         + Debug
         + Add<Output = Nw>
@@ -421,7 +421,7 @@ where
         + Debug,
     W: Write,
 {
-    type Params = Params<'a, IndexType, Nw, Ew>;
+    type Params = Params<'a, Nw, Ew>;
     type SupervisorType = Supervisor<W, Nw, Ew>;
 
     fn new(
@@ -475,7 +475,7 @@ where
 
 impl<'a, IndexType, Nw, Ew, W> Iterator for TwoSwap<'a, IndexType, Nw, Ew, W>
 where
-    IndexType: Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
+    IndexType: Distance<IndexType> + Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
     Nw: Copy
         + Debug
         + Add<Output = Nw>
@@ -527,7 +527,7 @@ mod tests {
         }
     }
 
-    fn nw(n: R64, _: R64, _: usize, _: R64) -> R64 {
+    fn nw(n: R64, _: R64, _: R64, _: R64) -> R64 {
         n
     }
 

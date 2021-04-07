@@ -19,14 +19,14 @@ use crate::metaheuristic::{
     TwoSwap,
 };
 use crate::rng::rng64;
-use crate::util::SmallVal;
+use crate::util::{Distance, SmallVal};
 
 pub struct DynamicGraphExperiment {}
 
 impl DynamicGraphExperiment {
     pub fn run_geopoint_config(
         config: &ExperimentConfig,
-        heuristic: &Heuristic<GeoPoint, R64, R64>,
+        heuristic: &Heuristic<R64, R64>,
         filename: &str,
     ) -> Result<(), ExperimentConfigError> {
         if config.experiment.cfg().finished {
@@ -72,7 +72,7 @@ impl DynamicGraphExperiment {
 
     pub fn run_usize_config(
         config: &ExperimentConfig,
-        heuristic: &Heuristic<usize, R64, R64>,
+        heuristic: &Heuristic<R64, R64>,
         filename: &str,
     ) -> Result<(), ExperimentConfigError> {
         if config.experiment.cfg().finished {
@@ -150,9 +150,11 @@ impl DynamicGraphExperiment {
         }
     }
 
-    fn run_experiment<IndexType: 'static + Clone + Hash + Copy + Eq + Debug + Display + Ord>(
+    fn run_experiment<
+        IndexType: 'static + Distance<IndexType> + Clone + Hash + Copy + Eq + Debug + Display + Ord,
+    >(
         config: &ExperimentConfig,
-        heuristic: &Heuristic<IndexType, R64, R64>,
+        heuristic: &Heuristic<R64, R64>,
         graph: MatrixGraph<IndexType, R64, R64>,
         filename: &str,
         nw_generator: &mut dyn FnMut() -> R64,
