@@ -107,6 +107,8 @@ fn main() {
             AlgoConfig::Aco(aco)
         } else if let Ok(random) = experiment.algorithm.random() {
             AlgoConfig::Random(random)
+        } else if let Ok(mmaco) = experiment.algorithm.mm_aco() {
+            AlgoConfig::MMAco(mmaco)
         } else {
             eprintln!("Invalid Algorithm config for {}", entry.to_str().unwrap());
             continue;
@@ -170,7 +172,7 @@ fn main() {
                     }
                 }
             }
-        } else if experiment.algorithm.aco().is_ok() {
+        } else if experiment.algorithm.aco().is_ok() || experiment.algorithm.mm_aco().is_ok() {
             if experiment.graph_creation.file().is_ok() {
                 for (heuristic, name) in aco_functions_geo.iter() {
                     println!("Running heuristic {}", name);

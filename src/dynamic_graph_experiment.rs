@@ -15,8 +15,8 @@ use crate::graph::generate::{ErdosRenyi, Generate, Grid};
 use crate::graph::import::{import_pbf, ImportError};
 use crate::graph::{Edge, GenericWeightedGraph, MatrixGraph};
 use crate::metaheuristic::{
-    aco, random_search, two_swap, Aco, Heuristic, Metaheuristic, ProblemInstance, RandomSearch,
-    TwoSwap,
+    aco, mm_aco, random_search, two_swap, Aco, Heuristic, MMAco, Metaheuristic, ProblemInstance,
+    RandomSearch, TwoSwap,
 };
 use crate::rng::rng64;
 use crate::util::{Distance, SmallVal};
@@ -164,17 +164,7 @@ impl DynamicGraphExperiment {
         let g_nodes = graph.node_ids();
         let mut start_rng = rng64(experiment_cfg.seed as u128);
         let start_node = g_nodes[(start_rng.rand_float() * g_nodes.len() as f64) as usize];
-        let mut o_nodes: HashMap<IndexType, R64> = graph
-            .iter_nodes()
-            .map(|(id, weight)| (id, *weight))
-            .collect();
-        let mut o_edges: HashMap<Edge<IndexType>, R64> = graph
-            .iter_edges()
-            .map(|(id, weight)| (id, *weight))
-            .collect();
         let graph_rc = RefCell::new(graph);
-        // let dynamics_cfg = config.graph_dynamics.cfg();
-        // let mut dyn_rng = rng64(dynamics_cfg.seed as u128);
         let instance = ProblemInstance::new(
             &graph_rc,
             start_node,
@@ -182,7 +172,6 @@ impl DynamicGraphExperiment {
         );
         let fw = File::create(filename).unwrap();
 
-        let mut ew_gen = ew_generator;
         if let Ok(aco_cfg) = config.algorithm.aco() {
             let inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
             let params = aco::Params::new(
@@ -199,26 +188,29 @@ impl DynamicGraphExperiment {
             let mut aco_algo = Aco::new(instance, params, supervisor);
 
             for _ in (0..aco_cfg.iterations).progress() {
-                // if i % dynamics_cfg.change_after_i == 0 {
-                //     change_graph(
-                //         &graph_rc,
-                //         &config.graph_dynamics,
-                //         &mut dyn_rng,
-                //         nw_generator,
-                //         match ew_gen {
-                //             Some(ref mut gen) => Some(gen),
-                //             _ => None,
-                //         },
-                //         &mut o_nodes,
-                //         &mut o_edges,
-                //     );
-
-                //     inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
-                //     aco_algo.set_inv_shortest_paths(inv_shortest_paths)
-                // }
                 aco_algo.single_iteration();
             }
             aco_algo.supervisor.aggregate_receive();
+        } else if let Ok(mmaco_cfg) = config.algorithm.mm_aco() {
+            let inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
+            let params = mm_aco::Params::new(
+                heuristic,
+                mmaco_cfg.alpha,
+                mmaco_cfg.beta,
+                mmaco_cfg.rho,
+                Some(mmaco_cfg.seed as u128),
+                mmaco_cfg.ant_count,
+                mmaco_cfg.p_best,
+                inv_shortest_paths,
+            );
+            let supervisor =
+                aco::Supervisor::new(experiment_cfg.aggregation_rate, Writer::from_writer(fw));
+            let mut mmaco_algo = MMAco::new(instance, params, supervisor);
+
+            for _ in (0..mmaco_cfg.iterations).progress() {
+                mmaco_algo.single_iteration();
+            }
+            mmaco_algo.supervisor.aggregate_receive();
         } else if config.algorithm.two_swap().is_ok() {
             let params = two_swap::Params::new(heuristic);
             let supervisor =
@@ -227,20 +219,6 @@ impl DynamicGraphExperiment {
 
             let mut i = 0;
             while two_swap_algo.single_iteration().is_some() {
-                // if i % dynamics_cfg.change_after_i == 0 {
-                //     change_graph(
-                //         &graph_rc,
-                //         &config.graph_dynamics,
-                //         &mut dyn_rng,
-                //         nw_generator,
-                //         match ew_gen {
-                //             Some(ref mut gen) => Some(gen),
-                //             _ => None,
-                //         },
-                //         &mut o_nodes,
-                //         &mut o_edges,
-                //     );
-                // }
                 i += 1;
             }
             println!("Took {} iterations", i);
