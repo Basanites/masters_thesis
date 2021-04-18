@@ -14,10 +14,10 @@ pub use two_swap_experiment::TwoSwapExperiment;
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(untagged)]
 pub enum AlgoConfig {
-    Aco(AcoExperiment),
-    UnseededAco(UnseededAcoExperiment),
     MMAco(MMAcoExperiment),
     UnseededMMAco(UnseededMMAcoExperiment),
+    Aco(AcoExperiment),
+    UnseededAco(UnseededAcoExperiment),
     TwoSwap(TwoSwapExperiment),
     Random(RandomSearchExperiment),
     UnseededRandom(UnseededRandomSearchExperiment),
@@ -34,9 +34,9 @@ impl AlgoConfig {
 
     pub fn mm_aco(&self) -> Result<MMAcoExperiment, ExperimentConfigError> {
         match self {
-            AlgoConfig::MMAco(aco) => Ok(*aco),
-            AlgoConfig::UnseededMMAco(usaco) => Ok(usaco.to_fixed()),
-            _ => Err(ExperimentConfigError::NotAco),
+            AlgoConfig::MMAco(mmaco) => Ok(*mmaco),
+            AlgoConfig::UnseededMMAco(usmmaco) => Ok(usmmaco.to_fixed()),
+            _ => Err(ExperimentConfigError::NotMMAco),
         }
     }
 

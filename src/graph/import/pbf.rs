@@ -347,5 +347,11 @@ pub fn import_pbf(
         }
     }
 
+    println!(
+        "The final graph has {} nodes and {} edges",
+        mapped_graph.order(),
+        mapped_graph.size()
+    );
+
     Ok(mapped_graph)
 }

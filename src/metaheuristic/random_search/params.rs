@@ -1,17 +1,17 @@
 use crate::metaheuristic::{Heuristic, Solution};
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 pub struct Params<'a, IndexType, Nw, Ew> {
     pub heuristic: &'a Heuristic<Nw, Ew>,
-    pub inv_shortest_paths: &'a HashMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
+    pub inv_shortest_paths: &'a BTreeMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
     pub seed: u128,
 }
 
 impl<'a, IndexType, Nw, Ew> Params<'a, IndexType, Nw, Ew> {
     pub fn new(
         heuristic: &'a Heuristic<Nw, Ew>,
-        inv_shortest_paths: &'a HashMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
+        inv_shortest_paths: &'a BTreeMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
         seed: u128,
     ) -> Self {
         Params {

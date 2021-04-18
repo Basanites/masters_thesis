@@ -1,6 +1,6 @@
 use num_traits::Zero;
 use std::cmp::{Eq, Ord, Ordering};
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BTreeMap, BinaryHeap};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -16,8 +16,8 @@ pub struct MatrixGraph<IndexType: Clone, Nw, Ew> {
     node_weights: Vec<Option<Nw>>,
     order: usize,
     size: usize,
-    node_map: HashMap<IndexType, usize>,
-    inv_node_map: HashMap<usize, IndexType>,
+    node_map: BTreeMap<IndexType, usize>,
+    inv_node_map: BTreeMap<usize, IndexType>,
     phantom: PhantomData<IndexType>,
 }
 
@@ -41,8 +41,8 @@ impl<Nw: Clone, Ew: Clone> MatrixGraph<usize, Nw, Ew> {
             node_weights: nodes.into_iter().map(Some).collect(),
             order: node_amount,
             size: edges.len(),
-            node_map: HashMap::new(),
-            inv_node_map: HashMap::new(),
+            node_map: BTreeMap::new(),
+            inv_node_map: BTreeMap::new(),
             phantom: PhantomData,
         };
 
@@ -70,8 +70,8 @@ impl<Nw: Clone, Ew: Clone> MatrixGraph<usize, Nw, Ew> {
 //             node_weights: vec![Some(()); nodes],
 //             order: nodes,
 //             size: edges.len(),
-//             node_map: HashMap::new(),
-//             inv_node_map: HashMap::new(),
+//             node_map: BTreeMap::new(),
+//             inv_node_map: BTreeMap::new(),
 //             phantom: PhantomData,
 //         };
 
@@ -110,8 +110,8 @@ where
         nodes: Vec<(IndexType, Nw)>,
         edges: Vec<(Edge<IndexType>, Ew)>,
     ) -> Result<Self, GraphError<IndexType>> {
-        let mut node_map = HashMap::new();
-        let mut inv_node_map = HashMap::new();
+        let mut node_map = BTreeMap::new();
+        let mut inv_node_map = BTreeMap::new();
         for (i, loc) in nodes.iter().enumerate() {
             node_map.insert(loc.0, i);
             inv_node_map.insert(i, loc.0);
@@ -160,8 +160,8 @@ where
     #[allow(dead_code)]
     fn cast_usize_to_generic_graph(
         ugraph: MatrixGraph<usize, Nw, Ew>,
-        nmap: HashMap<IndexType, usize>,
-        imap: HashMap<usize, IndexType>,
+        nmap: BTreeMap<IndexType, usize>,
+        imap: BTreeMap<usize, IndexType>,
     ) -> MatrixGraph<IndexType, Nw, Ew> {
         MatrixGraph {
             adjacency_matrix: ugraph.adjacency_matrix,
@@ -183,8 +183,8 @@ where
             node_weights: Vec::new(),
             order: 0,
             size: 0,
-            node_map: HashMap::new(),
-            inv_node_map: HashMap::new(),
+            node_map: BTreeMap::new(),
+            inv_node_map: BTreeMap::new(),
             phantom: PhantomData,
         }
     }
@@ -196,8 +196,8 @@ where
             node_weights: vec![None; size],
             order: 0,
             size: 0,
-            node_map: HashMap::with_capacity(size),
-            inv_node_map: HashMap::with_capacity(size),
+            node_map: BTreeMap::new(),
+            inv_node_map: BTreeMap::new(),
             phantom: PhantomData,
         }
     }
@@ -825,9 +825,9 @@ where
     default fn shortest_paths(
         &self,
         from_node: Self::IndexType,
-    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+    ) -> BTreeMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
         let (prevs, dists) = self._shortest_paths(self.node_map[&from_node]);
-        let mut res = HashMap::new();
+        let mut res = BTreeMap::new();
 
         for i in 0..prevs.len() {
             let mut created = false;
@@ -867,9 +867,9 @@ where
     default fn inv_shortest_paths(
         &self,
         to_node: Self::IndexType,
-    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+    ) -> BTreeMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
         let (prevs, dists) = self._inv_shortest_paths(self.node_map[&to_node]);
-        let mut res = HashMap::new();
+        let mut res = BTreeMap::new();
 
         for i in 0..prevs.len() {
             let mut created = false;
@@ -985,9 +985,9 @@ where
     fn shortest_paths(
         &self,
         from_node: usize,
-    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+    ) -> BTreeMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
         let (prevs, dists) = self._shortest_paths(from_node);
-        let mut res = HashMap::new();
+        let mut res = BTreeMap::new();
 
         for i in 0..prevs.len() {
             let mut created = false;
@@ -1027,9 +1027,9 @@ where
     fn inv_shortest_paths(
         &self,
         to_node: usize,
-    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+    ) -> BTreeMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
         let (prevs, dists) = self._inv_shortest_paths(to_node);
-        let mut res = HashMap::new();
+        let mut res = BTreeMap::new();
 
         for i in 0..prevs.len() {
             let mut created = false;
@@ -1768,12 +1768,8 @@ mod geopoint_indexed_tests {
         let graph = MatrixGraph::<GeoPoint, usize, usize>::with_size(5);
 
         assert!(
-            graph.node_map.capacity() >= 5,
+            graph.node_weights.len() >= 5,
             "Not enough space in node map."
-        );
-        assert!(
-            graph.inv_node_map.capacity() >= 5,
-            "Not enough space in inverse node map."
         );
         assert_eq!(
             graph.node_ids().len(),
@@ -1802,6 +1798,17 @@ mod geopoint_indexed_tests {
             graph.inv_node_map.contains_key(&2),
             "Inverse node map is missing a key."
         );
+
+        assert_eq!(
+            graph.adjacency_matrix,
+            vec![
+                vec![None, Some(100), None],
+                vec![None, None, Some(101)],
+                vec![Some(200), Some(50), None],
+            ]
+        );
+
+        assert_eq!(graph.node_weights, vec![Some(12), Some(21), Some(7)]);
     }
 
     #[test]
@@ -1878,9 +1885,10 @@ mod geopoint_indexed_tests {
         let p4 = GeoPoint::from_degrees(2.4, 53.3);
         let empty = MatrixGraph::<GeoPoint, usize, usize>::default();
 
+        // The nodes in id list will be sorted according to the id types ordering
         assert_eq!(
-            graph.node_ids().sort(),
-            vec![p1, p2, p3].sort(),
+            graph.node_ids(),
+            vec![p2, p3, p1],
             "Nodes are not the ones used to construct."
         );
         assert_eq!(
@@ -1892,8 +1900,8 @@ mod geopoint_indexed_tests {
         graph.add_node(p4, 5).unwrap();
 
         assert_eq!(
-            graph.node_ids().sort(),
-            vec![p1, p2, p3, p4].sort(),
+            graph.node_ids(),
+            vec![p4, p2, p3, p1],
             "The node p4 should be in, since it was just added."
         );
     }

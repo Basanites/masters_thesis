@@ -50,9 +50,9 @@ impl DynamicGraphExperiment {
             };
             let pbf = import_pbf(f.filename.as_str(), &mut nw_gen);
             match pbf {
-                Err(ImportError::MissingFile(msg)) => {
-                    Err(ExperimentConfigError::InvalidGraphConfig(msg))
-                }
+                Err(ImportError::MissingFile(msg)) => Err(
+                    ExperimentConfigError::InvalidGraphConfig(format!("File not found: {}", msg)),
+                ),
                 Ok(graph) => Self::run_experiment::<GeoPoint>(
                     config,
                     heuristic,

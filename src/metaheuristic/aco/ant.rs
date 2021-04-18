@@ -9,7 +9,7 @@ use num_traits::identities::{One, Zero};
 use serde::Serialize;
 use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::ops::AddAssign;
@@ -33,7 +33,7 @@ where
     heuristic: &'a Heuristic<Nw, Ew>,
     sender: Sender<Message<Nw, Ew>>,
     id: usize,
-    inv_shortest_paths: &'a HashMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
+    inv_shortest_paths: &'a BTreeMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
 }
 
 impl<'a, IndexType, Nw> Ant<'a, IndexType, Nw, R64>
@@ -59,7 +59,7 @@ where
         beta: f64,
         sender: Sender<Message<Nw, R64>>,
         id: usize,
-        inv_shortest_paths: &'a HashMap<IndexType, Option<(Solution<IndexType>, R64)>>,
+        inv_shortest_paths: &'a BTreeMap<IndexType, Option<(Solution<IndexType>, R64)>>,
     ) -> Self {
         Ant {
             graph,
@@ -131,7 +131,7 @@ where
         let mut tail_length = R64::zero();
         let mut next_node = self.goal_point;
         let mut goal_reached = false;
-        let mut visited: HashMap<IndexType, bool> = HashMap::new();
+        let mut visited: BTreeMap<IndexType, bool> = BTreeMap::new();
         while !goal_reached {
             let viable_candidates: Vec<_> = self
                 .graph

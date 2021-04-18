@@ -11,7 +11,7 @@ use crate::metaheuristic::Solution;
 pub use error::GraphError;
 pub use matrix_graph::MatrixGraph;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
 
 pub type Edge<IndexType> = (IndexType, IndexType);
@@ -147,13 +147,13 @@ pub trait GenericWeightedGraph {
     fn shortest_paths(
         &self,
         from_node: Self::IndexType,
-    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Self::EdgeWeightType)>>;
+    ) -> BTreeMap<Self::IndexType, Option<(Solution<Self::IndexType>, Self::EdgeWeightType)>>;
 
     /// Calculates the shortest path to the given node from all other nodes.
     fn inv_shortest_paths(
         &self,
         to_node: Self::IndexType,
-    ) -> HashMap<Self::IndexType, Option<(Solution<Self::IndexType>, Self::EdgeWeightType)>>;
+    ) -> BTreeMap<Self::IndexType, Option<(Solution<Self::IndexType>, Self::EdgeWeightType)>>;
 }
 
 pub trait WeightedGraph: GenericWeightedGraph<IndexType = usize> {}

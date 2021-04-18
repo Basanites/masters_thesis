@@ -116,6 +116,7 @@ pub struct ExperimentConfig {
 #[derive(Debug)]
 pub enum ExperimentConfigError {
     NotAco,
+    NotMMAco,
     NotTwoSwap,
     NotRandom,
     InvalidAlgorithmConfig(String),
@@ -129,6 +130,7 @@ impl fmt::Display for ExperimentConfigError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotAco => write!(f, "Config is not a valid ACO config."),
+            Self::NotMMAco => write!(f, "Config is not a valid MMAco config."),
             Self::NotTwoSwap => write!(f, "Config is not a valid TwoSwap config."),
             Self::NotRandom => write!(f, "Config is not a valid RandomSearch config."),
             Self::InvalidAlgorithmConfig(msg) => write!(f, "{}", msg),

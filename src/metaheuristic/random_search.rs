@@ -17,7 +17,7 @@ use oorandom::Rand64;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::default::Default;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
@@ -48,7 +48,7 @@ pub struct RandomSearch<
     pub best_length: EdgeWeightType,
     pub supervisor: Supervisor<W, NodeWeightType, EdgeWeightType>,
     i: usize,
-    inv_shortest_paths: &'a HashMap<IndexType, Option<(Solution<IndexType>, EdgeWeightType)>>,
+    inv_shortest_paths: &'a BTreeMap<IndexType, Option<(Solution<IndexType>, EdgeWeightType)>>,
     rng: Rand64,
 }
 
@@ -103,7 +103,7 @@ where
 
         let g_borrow = self.graph.borrow();
         let mut heuristic_score = R64::zero();
-        let mut visited: HashMap<IndexType, bool> = HashMap::new();
+        let mut visited: BTreeMap<IndexType, bool> = BTreeMap::new();
         let mut length = EdgeWeightType::zero();
         for (from, to) in solution.iter_edges() {
             let dist = *g_borrow.edge_weight((*from, *to)).unwrap();
@@ -156,7 +156,7 @@ where
     }
 
     fn generate(&mut self, start_time: Instant) -> bool {
-        let mut visited: HashMap<IndexType, bool> = HashMap::new();
+        let mut visited: BTreeMap<IndexType, bool> = BTreeMap::new();
         let mut length = EdgeWeightType::zero();
         let mut solution = Solution::from_nodes(vec![self.goal_point]);
         let mut goal_reached = false;

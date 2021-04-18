@@ -30,8 +30,8 @@ impl Fix<MMAcoExperiment> for UnseededMMAcoExperiment {
             alpha: self.alpha,
             beta: self.beta,
             rho: self.rho,
-            ant_count: self.ant_count,
             seed: (os_random_seed() >> 64) as u64,
+            ant_count: self.ant_count,
             p_best: self.p_best,
             iterations: self.iterations,
         }

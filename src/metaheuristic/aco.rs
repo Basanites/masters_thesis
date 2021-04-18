@@ -21,7 +21,7 @@ use oorandom::Rand64;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::io::Write;
@@ -52,7 +52,7 @@ where
     best_length: Ew,
     pub supervisor: Supervisor<W, Nw, Ew>,
     rng: Rand64,
-    inv_shortest_paths: HashMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
+    inv_shortest_paths: BTreeMap<IndexType, Option<(Solution<IndexType>, Ew)>>,
 }
 
 impl<'a, IndexType, Nw, W> Aco<'a, IndexType, Nw, R64, W>
@@ -92,7 +92,7 @@ where
 
     pub fn set_inv_shortest_paths(
         &mut self,
-        inv_shortest_paths: HashMap<IndexType, Option<(Solution<IndexType>, R64)>>,
+        inv_shortest_paths: BTreeMap<IndexType, Option<(Solution<IndexType>, R64)>>,
     ) {
         self.inv_shortest_paths = inv_shortest_paths
     }
@@ -145,13 +145,14 @@ where
         let mut ants = Vec::with_capacity(self.ant_count);
         for _ in 0..self.ant_count {
             let (sender, id) = self.supervisor.new_ant();
+            let seed = self.rng.rand_u64() as u128 + ((self.rng.rand_u64() as u128) << 64);
             ants.push(Ant::new(
                 self.graph,
                 &self.pheromone_matrix,
                 self.goal_point,
                 self.max_time,
                 self.heuristic,
-                self.rng.rand_u64() as u128 + ((self.rng.rand_u64() as u128) << 64),
+                seed,
                 self.alpha,
                 self.beta,
                 sender,
@@ -162,7 +163,8 @@ where
 
         let mut solutions = Vec::new();
         for ant in ants {
-            solutions.push(ant.get_solution())
+            let solution = ant.get_solution();
+            solutions.push(solution)
         }
 
         let start_time = Instant::now();
