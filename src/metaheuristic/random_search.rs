@@ -91,7 +91,6 @@ where
     fn send_message(
         &self,
         iteration: usize,
-        evaluations: usize,
         n_improvements: usize,
         changes: usize,
         phase: usize,
@@ -141,7 +140,7 @@ where
 
         tx.send(Message::new(
             iteration,
-            evaluations,
+            solution.edges().len(),
             n_improvements,
             changes,
             phase,
@@ -206,7 +205,6 @@ where
             self.send_message(
                 self.i,
                 solution.nodes().len(),
-                0,
                 0,
                 0,
                 start_time.elapsed(),
@@ -279,7 +277,6 @@ where
         } else {
             self.send_message(
                 self.i,
-                0,
                 0,
                 0,
                 2,

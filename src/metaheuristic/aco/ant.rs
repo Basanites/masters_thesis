@@ -39,7 +39,7 @@ where
 impl<'a, IndexType, Nw> Ant<'a, IndexType, Nw, R64>
 where
     IndexType: Distance<IndexType> + Copy + PartialEq + Debug + Hash + Eq + Display + Ord,
-    Nw: Copy + Zero + One + AddAssign<Nw>,
+    Nw: Copy + Zero + One + AddAssign<Nw> + PartialEq,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -119,7 +119,7 @@ where
         }
     }
 
-    pub fn get_solution(&self) -> Solution<IndexType> {
+    pub fn get_solution(&self) -> AntSolution<IndexType, Nw> {
         let start_time = Instant::now();
         let mut evals = 0;
         let mut changes = 0;
@@ -132,6 +132,8 @@ where
         let mut next_node = self.goal_point;
         let mut goal_reached = false;
         let mut visited: BTreeMap<IndexType, bool> = BTreeMap::new();
+        let mut val_sum = Nw::zero();
+        let mut nodes_with_val = 0;
         while !goal_reached {
             let viable_candidates: Vec<_> = self
                 .graph
@@ -200,14 +202,6 @@ where
             // according to the formula at https://en.wikipedia.org/wiki/Ant_colony_optimization_algorithms#Edge_selection
             let rand = R64::from_inner(rng.rand_float()) * weighted_sum;
 
-            // println!(
-            //     "there are {} viable candidates for {} with a sum of {}, a random value {} and we have visited all? {}",
-            //     viable_candidates.len(),
-            //     next_node,
-            //     weighted_sum,
-            //     rand,
-            //     visited_all_viable
-            // );
             let mut sum = R64::zero();
             for &id in viable_candidates.iter() {
                 let pheromone_level = self.pheromone_matrix.edge_weight((next_node, id)).unwrap();
@@ -238,22 +232,23 @@ where
                     //     goal_reached = true;
                     // }
                     next_node = id;
+                    let borrow = self.graph.borrow();
+                    let nw = borrow.node_weight(id);
+                    if !visited.contains_key(&id) && nw.is_ok() {
+                        let nw_val = *nw.unwrap();
+                        if nw_val == Nw::zero() {
+                            break;
+                        }
+
+                        nodes_with_val += 1;
+                        val_sum += nw_val;
+                    }
                     break;
                 }
             }
         }
 
-        let g_borrow = self.graph.borrow();
-        let mut visited_nodes = 0;
-        let mut nodes_with_val = 0;
-        let mut val_sum = Nw::zero();
-        for node in solution.iter_nodes() {
-            visited_nodes += 1;
-            if let Ok(weight) = g_borrow.node_weight(*node) {
-                nodes_with_val += 1;
-                val_sum += *weight;
-            }
-        }
+        let visited_nodes = visited.len();
 
         // TODO: log errors from sending here
         let _res = self.sender.send(Message::new(
@@ -270,6 +265,23 @@ where
             nodes_with_val,
             val_sum,
         ));
-        solution
+
+        AntSolution {
+            solution,
+            length: tail_length,
+            score,
+            visited_nodes,
+            visited_with_val: nodes_with_val,
+            val_sum,
+        }
     }
+}
+
+pub struct AntSolution<IndexType, NwType> {
+    pub solution: Solution<IndexType>,
+    pub length: R64,
+    pub score: R64,
+    pub visited_nodes: usize,
+    pub visited_with_val: usize,
+    pub val_sum: NwType,
 }

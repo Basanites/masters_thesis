@@ -171,29 +171,19 @@ where
         let mut best_length = R64::zero();
         let mut best_score = R64::zero();
         let mut best_solution = Solution::new();
-        let mut improvements = 0;
-        for solution in solutions.into_iter() {
-            let score_cont = solution_score(&solution, self.graph, self.heuristic);
-            let length_cont = solution_length(&solution, self.graph);
-            if let (Ok(score), Ok(length)) = (score_cont, length_cont) {
-                if length <= self.max_time && score > best_score {
-                    improvements += 1;
-                    best_score = score;
-                    best_length = length;
-                    best_solution = solution;
-                }
-            }
-        }
-
-        let g_borrow = self.graph.borrow();
         let mut visited_nodes = 0;
         let mut visited_with_val = 0;
         let mut val_sum = R64::zero();
-        for node in best_solution.iter_unique_nodes() {
-            visited_nodes += 1;
-            if let Ok(weight) = g_borrow.node_weight(node) {
-                visited_with_val += 1;
-                val_sum += *weight;
+        let mut improvements = 0;
+        for ant_solution in solutions.into_iter() {
+            if ant_solution.length <= self.max_time && ant_solution.score > best_score {
+                improvements += 1;
+                best_score = ant_solution.score;
+                best_length = ant_solution.length;
+                best_solution = ant_solution.solution;
+                visited_nodes = ant_solution.visited_nodes;
+                val_sum = ant_solution.val_sum;
+                visited_with_val = ant_solution.visited_with_val;
             }
         }
 
