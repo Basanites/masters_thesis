@@ -52,9 +52,11 @@ fn aco_h2(nw: R64, ew: R64, _dist_to_start: R64, _elapsed: R64) -> R64 {
 }
 
 fn aco_h3(nw: R64, _ew: R64, dist_to_start: R64, elapsed: R64) -> R64 {
-    if nw != R64::zero() {
+    if nw != R64::zero() && dist_to_start != R64::zero() {
         R64::powf(R64::one() - R64::one() / nw, R64::one() - elapsed)
             * R64::powf(R64::one() / dist_to_start, elapsed)
+    } else if nw != R64::zero() {
+        R64::powf(R64::one() - R64::one() / nw, R64::one() - elapsed)
     } else {
         R64::zero()
     }
@@ -68,8 +70,10 @@ fn run_cfg(path: &Path, experiment_location: &str) {
 
     let aco_functions_usize: Vec<(&Heuristic<R64, R64>, &str)> =
         vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
-    let aco_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> =
-        vec![(&aco_h1, "h1"), (&aco_h2, "h2"), (&aco_h3, "h3")];
+    let aco_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> = vec![
+        // (&aco_h1, "h1"), (&aco_h2, "h2"),
+        (&aco_h3, "h3"),
+    ];
 
     let random_functions_usize: Vec<(&Heuristic<R64, R64>, &str)> =
         vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
