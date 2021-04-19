@@ -223,6 +223,17 @@ where
                 // sum is bigger than the random value we generated, so we hit our node
                 // with the correct probability
                 if sum >= rand {
+                    // add to value sum and nodes with val
+                    let borrow = self.graph.borrow();
+                    let nw = borrow.node_weight(id);
+                    if !visited.contains_key(&id) && nw.is_ok() {
+                        let nw_val = *nw.unwrap();
+                        if nw_val != Nw::zero() {
+                            nodes_with_val += 1;
+                            val_sum += nw_val;
+                        }
+                    }
+
                     solution.push_node(id);
                     tail_length += distance;
                     score += weighted_heuristic;
@@ -232,17 +243,6 @@ where
                     //     goal_reached = true;
                     // }
                     next_node = id;
-                    let borrow = self.graph.borrow();
-                    let nw = borrow.node_weight(id);
-                    if !visited.contains_key(&id) && nw.is_ok() {
-                        let nw_val = *nw.unwrap();
-                        if nw_val == Nw::zero() {
-                            break;
-                        }
-
-                        nodes_with_val += 1;
-                        val_sum += nw_val;
-                    }
                     break;
                 }
             }

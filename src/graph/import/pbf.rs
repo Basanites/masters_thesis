@@ -3,7 +3,7 @@ use decorum::R64;
 use osmpbfreader::objects::Node;
 use osmpbfreader::OsmPbfReader;
 use osmpbfreader::{NodeId, OsmId, OsmObj};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::fs::File;
 
 use crate::geo::{geodistance_haversine, GeoPoint};
@@ -18,7 +18,7 @@ fn get_node_distance(node_1: &Node, node_2: &Node) -> f64 {
 }
 
 /// Calculates the traveltime in minutes for a given distance_map in km.
-fn traveltime_from_distance_map(dist_map: &HashMap<String, f64>) -> f64 {
+fn traveltime_from_distance_map(dist_map: &BTreeMap<String, f64>) -> f64 {
     dist_map
         .iter()
         .map(|(key, val)| -> f64 {
@@ -41,13 +41,13 @@ fn traveltime_from_distance_map(dist_map: &HashMap<String, f64>) -> f64 {
 /// Finds the replacement for a node and updates the distance_map and
 /// returns the replacement as well as the according distance map
 fn get_node_replacement(
-    replacement_map: &HashMap<OsmId, (OsmId, HashMap<String, f64>)>,
+    replacement_map: &BTreeMap<OsmId, (OsmId, BTreeMap<String, f64>)>,
     replacement: OsmId,
-    dist_map: HashMap<String, f64>,
-) -> (OsmId, HashMap<String, f64>) {
+    dist_map: BTreeMap<String, f64>,
+) -> (OsmId, BTreeMap<String, f64>) {
     // the updated distance map contains the sum of the replacement distances with the
     // distances it takes to get there.
-    let mut updated_dist_map = HashMap::new();
+    let mut updated_dist_map = BTreeMap::new();
     let replacement_pair = &replacement_map[&replacement];
     let other_dist_map = &replacement_pair.1;
     for key in dist_map.keys().chain(other_dist_map.keys()) {
@@ -66,9 +66,9 @@ fn get_node_replacement(
 /// updates the replacement map accordingly.
 /// Returns true if there have been any new replacements.
 fn find_contractable_nodes(
-    neighbors: &HashMap<OsmId, HashMap<OsmId, HashMap<String, f64>>>,
-    inv_neighbors: &HashMap<OsmId, Vec<OsmId>>,
-    replacement_map: &mut HashMap<OsmId, (OsmId, HashMap<String, f64>)>,
+    neighbors: &BTreeMap<OsmId, BTreeMap<OsmId, BTreeMap<String, f64>>>,
+    inv_neighbors: &BTreeMap<OsmId, Vec<OsmId>>,
+    replacement_map: &mut BTreeMap<OsmId, (OsmId, BTreeMap<String, f64>)>,
     circle_nodes: &mut HashSet<OsmId>,
 ) -> bool {
     let mut changed = false;
@@ -141,11 +141,11 @@ fn find_contractable_nodes(
 /// Contracts all nodes on a single connection path into one endpoint node.
 /// The distances for these nodes are updated according to their original distance with many hops in between.
 fn contract_nodes(
-    nodes: &mut HashMap<OsmId, OsmObj>,
-    neighbors: &mut HashMap<OsmId, HashMap<OsmId, HashMap<String, f64>>>,
-    inv_neighbors: HashMap<OsmId, Vec<OsmId>>,
+    nodes: &mut BTreeMap<OsmId, OsmObj>,
+    neighbors: &mut BTreeMap<OsmId, BTreeMap<OsmId, BTreeMap<String, f64>>>,
+    inv_neighbors: BTreeMap<OsmId, Vec<OsmId>>,
 ) {
-    let mut replacement_map: HashMap<OsmId, (OsmId, HashMap<String, f64>)> = HashMap::new();
+    let mut replacement_map: BTreeMap<OsmId, (OsmId, BTreeMap<String, f64>)> = BTreeMap::new();
     let mut circle_nodes = HashSet::<OsmId>::new();
     let mut changed = true;
     // find replacements as long, as the replacement map keeps changing
@@ -218,9 +218,9 @@ pub fn import_pbf(
     };
 
     let mut pbf = OsmPbfReader::new(file);
-    let mut neighbors = HashMap::<OsmId, HashMap<OsmId, HashMap<String, f64>>>::new();
-    let mut inv_neighbors = HashMap::<OsmId, Vec<OsmId>>::new();
-    let mut nodes = HashMap::<OsmId, OsmObj>::new();
+    let mut neighbors = BTreeMap::<OsmId, BTreeMap<OsmId, BTreeMap<String, f64>>>::new();
+    let mut inv_neighbors = BTreeMap::<OsmId, Vec<OsmId>>::new();
+    let mut nodes = BTreeMap::<OsmId, OsmObj>::new();
     // read all nodes from the pbf to their respective lists.
     // neighbors contain all successors of a node while inv_neighbors contains its predecessors.
     for obj in pbf.iter() {
@@ -239,7 +239,7 @@ pub fn import_pbf(
                     let p_key = OsmId::Node(pid);
                     let p_node = nodes[&p_key].node().unwrap(); // !!!
 
-                    // insert all the predecessors of a node into the hashmap,
+                    // insert all the predecessors of a node into the BTreeMap,
                     // creating a new vec of neighbors, if there wasnt one before
                     // This is just a list of neighbors going backwards.
                     // No further information is encoded.
@@ -267,13 +267,13 @@ pub fn import_pbf(
                                 .unwrap()
                                 .insert(road_type, distance);
                         } else {
-                            let mut new_dists = HashMap::new();
+                            let mut new_dists = BTreeMap::new();
                             new_dists.insert(road_type, distance);
                             neighbor_dists.insert(n_key, new_dists);
                         }
                     } else {
-                        let mut outer_map = HashMap::new();
-                        let mut inner_map = HashMap::new();
+                        let mut outer_map = BTreeMap::new();
+                        let mut inner_map = BTreeMap::new();
                         inner_map.insert(road_type, distance);
                         outer_map.insert(n_key, inner_map);
                         neighbors.insert(p_key, outer_map);
@@ -287,7 +287,7 @@ pub fn import_pbf(
     // initialize all nodes, which were in the nodes array but never appeared in a way
     for id in nodes.keys() {
         if !neighbors.contains_key(id) {
-            neighbors.insert(*id, HashMap::new());
+            neighbors.insert(*id, BTreeMap::new());
         }
         if !inv_neighbors.contains_key(id) {
             inv_neighbors.insert(*id, [].to_vec());
@@ -298,7 +298,7 @@ pub fn import_pbf(
     contract_nodes(&mut nodes, &mut neighbors, inv_neighbors);
 
     // Map node ids from osm to consecutive ids starting at 0
-    let mut node_map: HashMap<OsmId, GeoPoint> = HashMap::new();
+    let mut node_map: BTreeMap<OsmId, GeoPoint> = BTreeMap::new();
     for (id, obj) in nodes.iter() {
         if !node_map.contains_key(id) {
             let point = GeoPoint::from_micro_degrees(
