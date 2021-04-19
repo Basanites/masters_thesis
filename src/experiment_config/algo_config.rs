@@ -18,9 +18,9 @@ pub enum AlgoConfig {
     UnseededMMAco(UnseededMMAcoExperiment),
     Aco(AcoExperiment),
     UnseededAco(UnseededAcoExperiment),
-    TwoSwap(TwoSwapExperiment),
     Random(RandomSearchExperiment),
     UnseededRandom(UnseededRandomSearchExperiment),
+    TwoSwap(TwoSwapExperiment),
 }
 
 impl AlgoConfig {
