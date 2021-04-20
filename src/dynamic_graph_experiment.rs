@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::fs::File;
 use std::hash::Hash;
+use std::time::Instant;
 
 use crate::experiment_config::{ExperimentConfig, ExperimentConfigError, GraphDynamicsConfig};
 use crate::geo::GeoPoint;
@@ -233,7 +234,7 @@ impl DynamicGraphExperiment {
             );
             let mut random_algo = RandomSearch::new(instance, params, supervisor);
             for _ in (0..random_cfg.iterations).progress() {
-                random_algo.single_iteration();
+                random_algo.generate(Instant::now());
             }
             random_algo.supervisor.aggregate_receive();
         } else {

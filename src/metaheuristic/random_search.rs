@@ -154,7 +154,7 @@ where
         .unwrap();
     }
 
-    fn generate(&mut self, start_time: Instant) -> bool {
+    pub fn generate(&mut self, start_time: Instant) {
         let mut visited: BTreeMap<IndexType, bool> = BTreeMap::new();
         let mut length = EdgeWeightType::zero();
         let mut solution = Solution::from_nodes(vec![self.goal_point]);
@@ -188,7 +188,9 @@ where
                     length += distance;
                 }
                 goal_reached = true;
+                break;
             }
+
             let rand = (viable_candidates.len() as f64 * self.rng.rand_float()) as usize;
             let new_next_node = viable_candidates[rand];
             length += *self
@@ -198,25 +200,20 @@ where
                 .unwrap();
             solution.push_node(new_next_node);
             visited.insert(new_next_node, true);
-            next_node = new_next_node
+            next_node = new_next_node;
         }
 
-        if length < self.best_length {
-            self.send_message(
-                self.i,
-                solution.nodes().len(),
-                0,
-                0,
-                start_time.elapsed(),
-                length,
-                &solution,
-            );
+        self.send_message(
+            self.i,
+            solution.nodes().len(),
+            0,
+            0,
+            start_time.elapsed(),
+            length,
+            &solution,
+        );
 
-            self.i += 1;
-            true
-        } else {
-            false
-        }
+        self.i += 1;
     }
 }
 
@@ -272,7 +269,9 @@ where
 
     fn single_iteration(&mut self) -> Option<&Solution<IndexType>> {
         let start_time = Instant::now();
-        if self.generate(start_time) {
+        let prev_best = self.best_solution.clone();
+        self.generate(start_time);
+        if self.best_solution != prev_best {
             Some(&self.best_solution)
         } else {
             self.send_message(
