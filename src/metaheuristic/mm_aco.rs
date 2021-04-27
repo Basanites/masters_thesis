@@ -70,8 +70,13 @@ where
         // pheromone decay
         for edge in self.pheromone_matrix.edge_ids() {
             let weight = *self.pheromone_matrix.edge_weight(edge).unwrap();
-            let after_decay = R64::from_inner(1.0 - self.rho) * weight;
-            let _res = self.pheromone_matrix.change_edge(edge, after_decay);
+            let mut new_weight = R64::from_inner(1.0 - self.rho) * weight;
+            if new_weight < tau_min {
+                new_weight = tau_min;
+            } else if new_weight > tau_max {
+                new_weight = tau_max;
+            }
+            let _res = self.pheromone_matrix.change_edge(edge, new_weight);
         }
 
         // adding best solution
@@ -203,18 +208,15 @@ where
         self.supervisor.prepare_next();
 
         self.pheromone_update(&best_solution, best_score);
-        if best_score > self.best_score {
+        if best_score > self.best_score
+            || best_length < self.best_length && best_score == self.best_score
+        {
             // println!("solution improved");
             self.best_solution = best_solution;
             self.best_score = best_score;
             self.best_length = best_length;
 
             return Some(&self.best_solution);
-        } else if best_length < self.best_length && best_score == self.best_score {
-            // println!("solution length improved");
-            self.best_solution = best_solution;
-            self.best_score = best_score;
-            self.best_length = best_length;
         }
         None
     }
