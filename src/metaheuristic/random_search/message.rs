@@ -91,12 +91,9 @@ impl<Nw: Serialize, Ew: Serialize> Serialize for Message<Nw, Ew> {
         S: Serializer,
     {
         // 11 is the number of fields in the struct.
-        let mut state = serializer.serialize_struct("Message", 11)?;
+        let mut state = serializer.serialize_struct("Message", 8)?;
         state.serialize_field("iteration", &self.iteration)?;
         state.serialize_field("evaluations", &self.evaluations)?;
-        state.serialize_field("n_improvements", &self.n_improvements)?;
-        state.serialize_field("changes", &self.changes)?;
-        state.serialize_field("phase", &self.phase)?;
         state.serialize_field("cpu_time_mus", &self.cpu_time.as_micros())?;
         state.serialize_field("distance", &self.distance)?;
         state.serialize_field("heuristic_score", &self.heuristic_score.into_inner())?;
@@ -113,12 +110,9 @@ impl Serialize for Message<R64, R64> {
         S: Serializer,
     {
         // 12 is the number of fields in the struct.
-        let mut state = serializer.serialize_struct("Message", 11)?;
+        let mut state = serializer.serialize_struct("Message", 8)?;
         state.serialize_field("iteration", &self.iteration)?;
         state.serialize_field("evaluations", &self.evaluations)?;
-        state.serialize_field("n_improvements", &self.n_improvements)?;
-        state.serialize_field("changes", &self.changes)?;
-        state.serialize_field("phase", &self.phase)?;
         state.serialize_field("cpu_time_mus", &self.cpu_time.as_micros())?;
         state.serialize_field("distance", &self.distance.into_inner())?;
         state.serialize_field("heuristic_score", &self.heuristic_score.into_inner())?;

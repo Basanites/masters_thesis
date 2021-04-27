@@ -70,28 +70,35 @@ where
             }
         }
 
-        for ant_id in 0..self.messages.len() {
-            let messages = self.messages.get(&ant_id).unwrap();
-            for i in 0..messages.len() {
+        for i in 0..self.messages.get(&0).unwrap().len() {
+            let best_msg = self.messages.get(&0).unwrap().get(i).unwrap();
+            let mut evals = 0;
+            let mut cpu_time = Duration::from_micros(0);
+            for ant_id in 1..self.messages.len() {
+                let messages = self.messages.get(&ant_id).unwrap();
                 let msg_info = messages.get(i).unwrap();
-                let record = aco::Message::new(
-                    ant_id,
-                    i * self.aggregation_rate,
-                    msg_info.evaluations,
-                    msg_info.n_improvements,
-                    msg_info.changes,
-                    msg_info.phase,
-                    msg_info.cpu_time,
-                    msg_info.distance,
-                    msg_info.heuristic_score,
-                    msg_info.visited_nodes,
-                    msg_info.visited_nodes_with_val,
-                    msg_info.collected_val,
-                );
-                let res = self.writer.serialize(&record);
-                if let Err(err) = res {
-                    eprintln!("{:?}", err);
-                }
+                evals += msg_info.evaluations;
+                cpu_time += msg_info.cpu_time;
+            }
+
+            let record = aco::Message::new(
+                0,
+                i * self.aggregation_rate,
+                evals,
+                best_msg.n_improvements,
+                best_msg.changes,
+                best_msg.phase,
+                cpu_time,
+                best_msg.distance,
+                best_msg.heuristic_score,
+                best_msg.visited_nodes,
+                best_msg.visited_nodes_with_val,
+                best_msg.collected_val,
+            );
+
+            let res = self.writer.serialize(&record);
+            if let Err(err) = res {
+                eprintln!("{:?}", err);
             }
         }
 

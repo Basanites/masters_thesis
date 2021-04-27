@@ -73,10 +73,8 @@ fn run_cfg(path: &Path, experiment_location: &str) {
     let aco_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> =
         vec![(&aco_h1, "h1"), (&aco_h2, "h2"), (&aco_h3, "h3")];
 
-    let random_functions_usize: Vec<(&Heuristic<R64, R64>, &str)> =
-        vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
-    let random_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> =
-        vec![(&aco_h1, "h1"), (&aco_h2, "h2"), (&aco_h3, "h3")];
+    let random_functions_usize: Vec<(&Heuristic<R64, R64>, &str)> = vec![(&aco_h2, "h2")];
+    let random_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> = vec![(&aco_h2, "h2")];
     let entry = path;
     let stem = entry.file_stem().unwrap().to_str().unwrap();
 

@@ -208,7 +208,7 @@ impl DynamicGraphExperiment {
                 aco::Supervisor::new(experiment_cfg.aggregation_rate, Writer::from_writer(fw));
             let mut mmaco_algo = MMAco::new(instance, params, supervisor);
 
-            for _ in (0..mmaco_cfg.iterations).progress() {
+            for _i in (0..mmaco_cfg.iterations).progress() {
                 mmaco_algo.single_iteration();
             }
             mmaco_algo.supervisor.aggregate_receive();
