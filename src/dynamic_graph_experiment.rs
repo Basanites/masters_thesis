@@ -200,7 +200,6 @@ impl DynamicGraphExperiment {
                 mmaco_cfg.alpha,
                 mmaco_cfg.beta,
                 mmaco_cfg.rho,
-                mmaco_cfg.q_0,
                 Some(mmaco_cfg.seed as u128),
                 mmaco_cfg.ant_count,
                 mmaco_cfg.p_best,
