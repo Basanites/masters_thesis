@@ -163,6 +163,14 @@ where
                     let (mut path, distance) = self.inv_shortest_paths[&next_node].clone().unwrap();
                     solution.append(&mut path);
                     tail_length += distance;
+                    for node in path.iter_nodes() {
+                        if !visited.contains_key(node) {
+                            visited.insert(*node, true);
+                            if *self.graph.borrow().node_weight(*node).unwrap() != Nw::zero() {
+                                nodes_with_val += 1;
+                            }
+                        }
+                    }
                 }
                 goal_reached = true;
                 break;
