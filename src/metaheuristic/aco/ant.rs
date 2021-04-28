@@ -174,7 +174,10 @@ where
                 .fold(R64::zero(), |acc, weight| {
                     acc + R64::powf(*weight, R64::from_inner(self.alpha))
                 });
+
             // the default is using the weighted sum as given by the paper
+            let mut best_node = viable_candidates[0];
+            let mut best_sum = R64::zero();
             let mut weighted_sum = viable_candidates
                 .iter()
                 .map(|&id| {
@@ -185,14 +188,24 @@ where
                     )
                 })
                 .inspect(|_| evals += 1) // increment evals for each call to heuristic
-                .fold(R64::zero(), |acc, (to, h_weight, p_weight)| {
-                    acc + self.conditional_weighted_heuristic(
-                        !visited.contains_key(&to),
+                .map(|(to, h_weight, p_weight)| {
+                    (
                         to,
-                        h_weight,
-                        tail_length,
-                    ) * R64::powf(*p_weight, R64::from_inner(self.alpha))
-                });
+                        (self.conditional_weighted_heuristic(
+                            !visited.contains_key(&to),
+                            to,
+                            h_weight,
+                            tail_length,
+                        ) * R64::powf(*p_weight, R64::from_inner(self.alpha))),
+                    )
+                })
+                .inspect(|(to, sum)| {
+                    if sum > &best_sum {
+                        best_sum = *sum;
+                        best_node = *to;
+                    }
+                })
+                .fold(R64::zero(), |acc, (_, weighted_term)| acc + weighted_term);
 
             let mut visited_all_viable = false;
             if weighted_sum == R64::zero() {
@@ -203,10 +216,18 @@ where
             // as soon, as we reach a point where the sum of the weighted pheromones and heuristic
             // is equal to the random number, we have hit the value with the correct probability
             // according to the formula at https://en.wikipedia.org/wiki/Ant_colony_optimization_algorithms#Edge_selection
-            let rand = R64::from_inner(rng.rand_float()) * weighted_sum;
+            let frand = rng.rand_float();
+            let mut use_best = false;
+            if frand <= self.q_0 {
+                use_best = true;
+            }
+            let rand = R64::from_inner(frand) * weighted_sum;
 
             let mut sum = R64::zero();
             for &id in viable_candidates.iter() {
+                if use_best && id != best_node {
+                    continue;
+                }
                 let pheromone_level = self.pheromone_matrix.edge_weight((next_node, id)).unwrap();
                 let distance = *self.graph.borrow().edge_weight((next_node, id)).unwrap();
                 let weighted_heuristic = if !visited_all_viable {
@@ -225,7 +246,7 @@ where
 
                 // sum is bigger than the random value we generated, so we hit our node
                 // with the correct probability
-                if sum >= rand {
+                if sum >= rand || use_best {
                     // add to value sum and nodes with val
                     let borrow = self.graph.borrow();
                     let nw = borrow.node_weight(id);
