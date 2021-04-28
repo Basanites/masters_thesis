@@ -167,17 +167,29 @@ where
                 goal_reached = true;
             }
 
+            let mut best_by_pheromone = viable_candidates[0];
+            let mut best_pheromone = R64::zero();
             // weighted pheromone sum will be used in case we visited all neighbors of this node
             let weighted_pheromone_sum = viable_candidates
                 .iter()
-                .map(|&id| self.pheromone_matrix.edge_weight((next_node, id)).unwrap())
-                .fold(R64::zero(), |acc, weight| {
-                    acc + R64::powf(*weight, R64::from_inner(self.alpha))
-                });
+                .map(|id| {
+                    (
+                        id,
+                        self.pheromone_matrix.edge_weight((next_node, *id)).unwrap(),
+                    )
+                })
+                .map(|(id, weight)| (id, R64::powf(*weight, R64::from_inner(self.alpha))))
+                .inspect(|(id, weight)| {
+                    if weight > &best_pheromone {
+                        best_by_pheromone = **id;
+                        best_pheromone = *weight;
+                    }
+                })
+                .fold(R64::zero(), |acc, (_, weight_term)| acc + weight_term);
 
             // the default is using the weighted sum as given by the paper
             let mut best_node = viable_candidates[0];
-            let mut best_sum = R64::zero();
+            let mut best_full = R64::zero();
             let mut weighted_sum = viable_candidates
                 .iter()
                 .map(|&id| {
@@ -200,8 +212,8 @@ where
                     )
                 })
                 .inspect(|(to, sum)| {
-                    if sum > &best_sum {
-                        best_sum = *sum;
+                    if sum > &best_full {
+                        best_full = *sum;
                         best_node = *to;
                     }
                 })
@@ -210,6 +222,8 @@ where
             let mut visited_all_viable = false;
             if weighted_sum == R64::zero() {
                 weighted_sum = weighted_pheromone_sum;
+                best_node = best_by_pheromone;
+                best_full = best_pheromone;
                 visited_all_viable = true;
             }
 
@@ -231,6 +245,7 @@ where
                 let pheromone_level = self.pheromone_matrix.edge_weight((next_node, id)).unwrap();
                 let distance = *self.graph.borrow().edge_weight((next_node, id)).unwrap();
                 let weighted_heuristic = if !visited_all_viable {
+                    evals += 1;
                     self.conditional_weighted_heuristic(
                         !visited.contains_key(&id),
                         id,
@@ -242,7 +257,6 @@ where
                 };
                 sum +=
                     weighted_heuristic * R64::powf(*pheromone_level, R64::from_inner(self.alpha));
-                evals += 1;
 
                 // sum is bigger than the random value we generated, so we hit our node
                 // with the correct probability
