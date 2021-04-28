@@ -165,9 +165,10 @@ where
                     tail_length += distance;
                 }
                 goal_reached = true;
+                break;
             }
 
-            let mut best_by_pheromone = viable_candidates[0];
+            let mut best_by_pheromone = self.goal_point;
             let mut best_pheromone = R64::zero();
             // weighted pheromone sum will be used in case we visited all neighbors of this node
             let weighted_pheromone_sum = viable_candidates
@@ -188,7 +189,7 @@ where
                 .fold(R64::zero(), |acc, (_, weight_term)| acc + weight_term);
 
             // the default is using the weighted sum as given by the paper
-            let mut best_node = viable_candidates[0];
+            let mut best_node = self.goal_point;
             let mut best_full = R64::zero();
             let mut weighted_sum = viable_candidates
                 .iter()
