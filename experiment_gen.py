@@ -185,7 +185,7 @@ if __name__ == "__main__":
             run_random(nw_chance, nw_spread, run, restart,
                        prefix, constructions=10000)
 
-    # exploration in parameter space 
+    # exploration in parameter space
     for (run, restart) in itertools.product(range(0, 10), range(0, 1)):
         nw_spread = (1, (10.0, 200))
         nw_chance = (1, 0.5)
@@ -207,7 +207,7 @@ if __name__ == "__main__":
                      nw_spread, run, restart, prefix, folder='extended_cfgs')
 
     # confirmation of found best parameters as well as standard parameters
-    for (run, restart) in itertools.product(range(0, 10), range(0, 5)):
+    for (run, restart) in itertools.product(range(0, 20), range(0, 5)):
         nw_spread = (1, (10.0, 200))
         nw_chance = (1, 0.5)
 
