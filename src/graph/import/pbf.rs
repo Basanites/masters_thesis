@@ -38,170 +38,64 @@ fn traveltime_from_distance_map(dist_map: &BTreeMap<String, f64>) -> f64 {
         .sum()
 }
 
-/// Finds the replacement for a node and updates the distance_map and
-/// returns the replacement as well as the according distance map
-fn get_node_replacement(
-    replacement_map: &BTreeMap<OsmId, (OsmId, BTreeMap<String, f64>)>,
-    replacement: OsmId,
-    dist_map: BTreeMap<String, f64>,
-) -> (OsmId, BTreeMap<String, f64>) {
-    // the updated distance map contains the sum of the replacement distances with the
-    // distances it takes to get there.
-    let mut updated_dist_map = BTreeMap::new();
-    let replacement_pair = &replacement_map[&replacement];
-    let other_dist_map = &replacement_pair.1;
-    for key in dist_map.keys().chain(other_dist_map.keys()) {
-        if dist_map.contains_key(key) && other_dist_map.contains_key(key) {
-            updated_dist_map.insert(key.into(), dist_map[key] + other_dist_map[key]);
-        } else if dist_map.contains_key(key) {
-            updated_dist_map.insert(key.into(), dist_map[key]);
-        } else if other_dist_map.contains_key(key) {
-            updated_dist_map.insert(key.into(), other_dist_map[key]);
+fn add_btreemaps(map_a: &BTreeMap<String, f64>, map_b: &BTreeMap<String, f64>) -> BTreeMap<String, f64> {
+    let mut new_map = BTreeMap::new();
+    for key in map_a.keys().chain(map_b.keys()) {
+        if map_a.contains_key(key) && map_b.contains_key(key) {
+            new_map.insert(key.into(), map_a[key] + map_b[key]);
+        } else if map_a.contains_key(key) {
+            new_map.insert(key.into(), map_a[key]);
+        } else if map_b.contains_key(key) {
+            new_map.insert(key.into(), map_b[key]);
         }
     }
-    (replacement_pair.0, updated_dist_map)
+    return new_map
 }
 
-/// Finds all nodes which are on a path with just a single connection and
-/// updates the replacement map accordingly.
-/// Returns true if there have been any new replacements.
-fn find_contractable_nodes(
-    neighbors: &BTreeMap<OsmId, BTreeMap<OsmId, BTreeMap<String, f64>>>,
-    inv_neighbors: &BTreeMap<OsmId, Vec<OsmId>>,
-    replacement_map: &mut BTreeMap<OsmId, (OsmId, BTreeMap<String, f64>)>,
-    circle_nodes: &mut HashSet<OsmId>,
-) -> bool {
-    let mut changed = false;
-
-    let mut change_count = 0;
-    for (&nid, neighbor_nodes) in neighbors.iter() {
-        let start_node = nid;
-        let maxits = 500;
-
-        if neighbor_nodes.len() == 1 && inv_neighbors[&nid].len() == 1 {
-            let replacement_pair = neighbor_nodes.iter().last().unwrap();
-            let mut replacement = *replacement_pair.0;
-            let mut dist_map = replacement_pair.1.clone();
-            let mut counter = 0;
-
-            // we iterate as deeply, as our replacement map allows
-            while replacement_map.contains_key(&replacement) && counter < maxits {
-                let new_replacement_pair =
-                    get_node_replacement(&replacement_map, replacement, dist_map.clone());
-                replacement = new_replacement_pair.0;
-                dist_map = new_replacement_pair.1;
-
-                // if we find a new circle we add all its nodes to the circle_nodes
-                if replacement == start_node && !circle_nodes.contains(&replacement) {
-                    println!("circle detected for node {:?}", replacement);
-
-                    let new_replacement_pair = neighbor_nodes.iter().last().unwrap();
-                    let mut replacement = new_replacement_pair.0;
-                    while *replacement != start_node {
-                        print!(" {:?} to", replacement);
-                        circle_nodes.insert(*replacement);
-                        replacement = &replacement_map[replacement].0;
-                    }
-                    println!();
-                    circle_nodes.insert(*replacement);
-                    changed = true;
-                    change_count += 1;
-                    break;
-                }
-                counter += 1;
-            }
-
-            // only insert the replacement if it is actually a new discovery
-            if !replacement_map.contains_key(&nid) || replacement_map[&nid].0 != replacement {
-                replacement_map.insert(nid, (replacement, dist_map));
-                changed = true;
-                change_count += 1;
-            }
-        }
-        // if the node is part of a 2-way-path we can still contract it to the one it goes to
-        // else if neighbor_nodes.len() == 2 {
-        //     let mut oid = nid;
-        //     for (nid, _) in neighbor_nodes {
-        //         for iid in inv_neighbors[nid].iter() {
-        //             if iid == &start_node {
-        //                 oid = *iid;
-        //             }
-        //         }
-        //     }
-        //     // oid has changed, so it is part of such a 2-way situation
-        //     if oid != nid {
-        //         replacement_map.insert(nid, oid);
-        //     }
-        // }
-    }
-    println!("\t{:?} nodes have changed in replacement map", change_count);
-    changed
-}
 
 /// Contracts all nodes on a single connection path into one endpoint node.
 /// The distances for these nodes are updated according to their original distance with many hops in between.
 fn contract_nodes(
-    nodes: &mut BTreeMap<OsmId, OsmObj>,
-    neighbors: &mut BTreeMap<OsmId, BTreeMap<OsmId, BTreeMap<String, f64>>>,
+    nodes: BTreeMap<OsmId, OsmObj>,
+    neighbors: BTreeMap<OsmId, BTreeMap<OsmId, BTreeMap<String, f64>>>,
     inv_neighbors: BTreeMap<OsmId, Vec<OsmId>>,
-) {
-    let mut replacement_map: BTreeMap<OsmId, (OsmId, BTreeMap<String, f64>)> = BTreeMap::new();
-    let mut circle_nodes = HashSet::<OsmId>::new();
-    let mut changed = true;
-    // find replacements as long, as the replacement map keeps changing
-    let mut i = 0;
+) -> (BTreeMap<OsmId, OsmObj>, BTreeMap<OsmId, BTreeMap<OsmId, BTreeMap<String, f64>>>)
+{
+    let used_nodes: BTreeMap<OsmId, OsmObj> = nodes.iter().filter(|(id, _)| {
+        let ins = neighbors.get(id).map_or(0, |x| x.len());
+        let outs =  inv_neighbors.get(id).map_or(0, |x| x.len());
+        return !(ins == 1 && outs == 1) && (ins > 0 || outs > 0)
+    }).map(|(a, b)| (a.clone(), b.clone())).collect();
+    let mut used_neighbors: BTreeMap<OsmId, BTreeMap<OsmId, BTreeMap<String, f64>>> = BTreeMap::new();
 
-    while changed {
-        println!(
-            "contraction iteration {:?} with {:?} nodes to replace",
-            i,
-            replacement_map.len()
-        );
-        changed = find_contractable_nodes(
-            neighbors,
-            &inv_neighbors,
-            &mut replacement_map,
-            &mut circle_nodes,
-        ); // assignment with side effects == very bad style
-        i += 1;
-    }
-
-    // remove the nodes which only form a circle
-    // which is not connected to the rest of the graph in any way.
-    for node in &circle_nodes {
-        nodes.remove(node);
-        neighbors.remove(node);
-        replacement_map.remove(node);
-    }
-
-    // replace all occurences of a node with the specified replacement node from the map
-    for (_, neighbor_nodes) in neighbors.iter_mut() {
-        // find all nodes that need to be replaced
-        let mut to_change = Vec::new();
-        for &node in neighbor_nodes.keys() {
-            if replacement_map.contains_key(&node) {
-                to_change.push(node)
+    for (node, _) in used_nodes.iter() {
+        for (mut neighbor, mut distance_map) in neighbors.get(node).unwrap_or(&BTreeMap::new()).iter() {
+            let mut w_temp = distance_map.clone();
+            let mut prev = neighbor;                
+            while !used_nodes.contains_key(neighbor) {
+                prev = neighbor;
+                let inner = neighbors.get(neighbor).unwrap().first_key_value().unwrap();
+                neighbor = inner.0;
+                distance_map = inner.1;
+                if prev == neighbor {
+                    break
+                }
+                w_temp = add_btreemaps(&w_temp, distance_map);
+                let ind = neighbors.get(neighbor).unwrap().len();
+                let outd = inv_neighbors.get(neighbor).unwrap().len();
+            }
+            if neighbor == node {
+                continue
+            }
+            let mut new_map = BTreeMap::new();
+            new_map.insert(*neighbor, w_temp.clone());
+            if let Err(_) = used_neighbors.try_insert(*node, new_map) {
+                used_neighbors.get_mut(node).unwrap().insert(*neighbor, w_temp);
             }
         }
-        // replace them by removing the old values and inserting the new one
-        for id in to_change.iter() {
-            neighbor_nodes.remove(id);
-            let replacement = replacement_map.get(id).unwrap();
-            neighbor_nodes.insert(replacement.0, replacement.1.clone());
-        }
     }
-
-    // remove all nodes which got replaced
-    for (from, _) in replacement_map.iter() {
-        neighbors.remove(from);
-        nodes.remove(from);
-    }
-
-    println!(
-        "The replacement map contains {} items after removing {:?} nodes in a circle",
-        replacement_map.len(),
-        circle_nodes.len()
-    );
+    
+    return (used_nodes, used_neighbors)
 }
 
 /// Creates a minimized MatrixGraph from a given pbf file.
@@ -295,7 +189,7 @@ pub fn import_pbf(
     }
 
     // contract all nodes on single connection paths into one
-    contract_nodes(&mut nodes, &mut neighbors, inv_neighbors);
+    let (nodes, neighbors) = contract_nodes(nodes, neighbors, inv_neighbors);
 
     // Map node ids from osm to consecutive ids starting at 0
     let mut node_map: BTreeMap<OsmId, GeoPoint> = BTreeMap::new();
