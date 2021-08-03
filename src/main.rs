@@ -1,4 +1,11 @@
-#![feature(test, min_specialization, map_into_keys_values, total_cmp, map_first_last, map_try_insert)]
+#![feature(
+    test,
+    min_specialization,
+    map_into_keys_values,
+    total_cmp,
+    map_first_last,
+    map_try_insert
+)]
 #![allow(dead_code)]
 mod dynamic_graph_experiment;
 mod experiment_config;
@@ -96,6 +103,8 @@ fn run_cfg(path: &Path, experiment_location: &str) {
         AlgoConfig::TwoSwap(two)
     } else if let Ok(mmaco) = experiment.algorithm.mm_aco() {
         AlgoConfig::MMAco(mmaco)
+    } else if let Ok(acs) = experiment.algorithm.acs() {
+        AlgoConfig::Acs(acs)
     } else if let Ok(aco) = experiment.algorithm.aco() {
         AlgoConfig::Aco(aco)
     } else if let Ok(random) = experiment.algorithm.random() {
@@ -163,7 +172,10 @@ fn run_cfg(path: &Path, experiment_location: &str) {
                 }
             }
         }
-    } else if experiment.algorithm.aco().is_ok() || experiment.algorithm.mm_aco().is_ok() {
+    } else if experiment.algorithm.aco().is_ok()
+        || experiment.algorithm.acs().is_ok()
+        || experiment.algorithm.mm_aco().is_ok()
+    {
         if experiment.graph_creation.file().is_ok() {
             for (heuristic, name) in aco_functions_geo.iter() {
                 println!("Running heuristic {}", name);

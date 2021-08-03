@@ -1,4 +1,4 @@
-use crate::graph::{GenericWeightedGraph, MatrixGraph};
+use crate::graph::{Edge, GenericWeightedGraph, MatrixGraph};
 use crate::metaheuristic::aco::Message;
 use crate::metaheuristic::{Heuristic, Solution};
 use crate::rng::rng64;
@@ -9,7 +9,7 @@ use num_traits::identities::{One, Zero};
 use serde::Serialize;
 use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::ops::AddAssign;
@@ -134,7 +134,7 @@ where
         let mut tail_length = R64::zero();
         let mut next_node = self.goal_point;
         let mut goal_reached = false;
-        let mut visited: BTreeMap<IndexType, bool> = BTreeMap::new();
+        let mut visited: BTreeSet<IndexType> = BTreeSet::new();
         let mut val_sum = Nw::zero();
         let mut nodes_with_val = 0;
         while !goal_reached {
@@ -164,8 +164,8 @@ where
                     solution.append(&mut path);
                     tail_length += distance;
                     for node in path.iter_nodes() {
-                        if !visited.contains_key(node) {
-                            visited.insert(*node, true);
+                        if !visited.contains(node) {
+                            visited.insert(*node);
                             if *self.graph.borrow().node_weight(*node).unwrap() != Nw::zero() {
                                 nodes_with_val += 1;
                             }
@@ -213,7 +213,7 @@ where
                     (
                         to,
                         (self.conditional_weighted_heuristic(
-                            !visited.contains_key(&to),
+                            !visited.contains(&to),
                             to,
                             h_weight,
                             tail_length,
@@ -256,7 +256,7 @@ where
                 let weighted_heuristic = if !visited_all_viable {
                     evals += 1;
                     self.conditional_weighted_heuristic(
-                        !visited.contains_key(&id),
+                        !visited.contains(&id),
                         id,
                         distance,
                         tail_length,
@@ -273,7 +273,7 @@ where
                     // add to value sum and nodes with val
                     let borrow = self.graph.borrow();
                     let nw = borrow.node_weight(id);
-                    if !visited.contains_key(&id) && nw.is_ok() {
+                    if !visited.contains(&id) && nw.is_ok() {
                         let nw_val = *nw.unwrap();
                         if nw_val != Nw::zero() {
                             nodes_with_val += 1;
@@ -284,11 +284,8 @@ where
                     solution.push_node(id);
                     tail_length += distance;
                     score += weighted_heuristic;
-                    visited.insert(id, true);
+                    visited.insert(id);
                     changes += 1;
-                    // if id == self.goal_point {
-                    //     goal_reached = true;
-                    // }
                     next_node = id;
                     break;
                 }

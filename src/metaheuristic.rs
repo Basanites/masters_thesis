@@ -1,4 +1,5 @@
 pub mod aco;
+pub mod acs;
 pub mod mm_aco;
 pub mod random_search;
 mod solution;
@@ -6,6 +7,7 @@ pub mod supervisor;
 pub mod two_swap;
 
 pub use aco::Aco;
+pub use acs::Acs;
 pub use mm_aco::MMAco;
 pub use random_search::RandomSearch;
 pub use solution::{solution_length, solution_score, Solution, SolutionError};

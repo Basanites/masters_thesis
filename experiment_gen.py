@@ -17,6 +17,18 @@ def aco_cfg(alpha, beta, rho, q_0, seed, ant_count, constructions):
     iterations: {iterations}"""
 
 
+def acs_cfg(alpha, beta, rho, q_0, t_0, seed, ant_count, constructions):
+    iterations = math.ceil(constructions / ant_count)
+    return f"""    alpha: {alpha}
+    beta: {beta}
+    rho: {rho}
+    q_0: {q_0}
+    t_0: {t_0}
+    seed: {seed}
+    ant_count: {ant_count}
+    iterations: {iterations}"""
+
+
 def mm_aco_cfg(alpha, beta, rho, p_best, seed, ant_count, constructions):
     iterations = math.ceil(constructions / ant_count)
     return f"""    alpha: {alpha}
@@ -112,9 +124,9 @@ def run_as(alpha, beta, rho, ants, nw_chance, nw_spread, run, restart, prefix, c
         restart, 'as', algo_cfg, nw_spread,  nw_chance, param_name, folder)
 
 
-def run_acs(alpha, beta, rho, q_0, ants, nw_chance, nw_spread, run, restart, prefix, constructions=10000, folder='cfgs'):
-    algo_cfg = aco_cfg(alpha, beta, rho, q_0, run, ants, constructions)
-    param_name = f'a{alpha}b{beta}r{rho}q{q_0}n{ants}c{constructions}'
+def run_acs(alpha, beta, rho, q_0, t_0, ants, nw_chance, nw_spread, run, restart, prefix, constructions=10000, folder='cfgs'):
+    algo_cfg = acs_cfg(alpha, beta, rho, q_0, run, ants, constructions)
+    param_name = f'a{alpha}b{beta}r{rho}q{q_0}t{t_0}n{ants}c{constructions}'
 
     run_for_all_files(restart, 'acs', algo_cfg,
                       nw_spread, nw_chance, param_name, prefix, folder)
@@ -148,7 +160,7 @@ def run_as_default(nw_chance, nw_spread, run, restart, prefix):
 
 
 def run_acs_default(nw_chance, nw_spread, run, restart, prefix):
-    run_acs(1.0, 5.0, 0.9, 0.8, 30, nw_chance, nw_spread,
+    run_acs(1.0, 2.0, 0.9, 0.9, 1.0/10000.0, 30, nw_chance, nw_spread,
             run, restart, prefix, constructions=10000)
 
 
@@ -197,8 +209,8 @@ if __name__ == "__main__":
                    run, restart, prefix, folder='extended_cfgs')
 
         # acs parameter exploration
-        for (beta, rho, q_0, ants) in [x for x in itertools.product([5.0, 2.0, 8.0, 0.0], [0.9, 0.8, 0.7], [0.8, 0.9, 0.7], [30, 10, 25]) if x != (5.0, 0.9, 0.8, 30)]:
-            run_acs(alpha, beta, rho, q_0, ants, nw_chance, nw_spread,
+        for (beta, rho, q_0, ants) in [x for x in itertools.product([5.0, 2.0, 8.0, 0.0], [0.9, 0.8, 0.7], [0.8, 0.9, 0.7], [30, 10, 25]) if x != (2.0, 0.9, 0.8, 30)]:
+            run_acs(alpha, beta, rho, q_0, 1.0/10000.0, ants, nw_chance, nw_spread,
                     run, restart, prefix, folder='extended_cfgs')
 
         # mmas parameter exploration
@@ -220,7 +232,7 @@ if __name__ == "__main__":
 
         # new best params
         run_as(1.0, 1.0, 0.5, 25, nw_chance, nw_spread, run, restart, prefix)
-        run_acs(1.0, 5.0, 0.9, 0.7, 30, nw_chance,
+        run_acs(1.0, 5.0, 0.9, 0.7, 1.0/10000.0, 30, nw_chance,
                 nw_spread, run, restart, prefix)
         run_mmas(1.0, 2.0, 0.8, 0.05, 25, nw_chance,
                  nw_spread, run, restart, prefix)

@@ -16,8 +16,8 @@ use crate::graph::generate::{ErdosRenyi, Generate, Grid};
 use crate::graph::import::{import_pbf, ImportError};
 use crate::graph::{Edge, GenericWeightedGraph, MatrixGraph};
 use crate::metaheuristic::{
-    aco, mm_aco, random_search, two_swap, Aco, Heuristic, MMAco, Metaheuristic, ProblemInstance,
-    RandomSearch, TwoSwap,
+    aco, acs, mm_aco, random_search, two_swap, Aco, Acs, Heuristic, MMAco, Metaheuristic,
+    ProblemInstance, RandomSearch, TwoSwap,
 };
 use crate::rng::rng64;
 use crate::util::{Distance, SmallVal};
@@ -213,6 +213,27 @@ impl DynamicGraphExperiment {
                 mmaco_algo.single_iteration();
             }
             mmaco_algo.supervisor.aggregate_receive();
+        } else if let Ok(acs_cfg) = config.algorithm.acs() {
+            let inv_shortest_paths = graph_rc.borrow().inv_shortest_paths(start_node);
+            let params = acs::Params::new(
+                heuristic,
+                acs_cfg.alpha,
+                acs_cfg.beta,
+                acs_cfg.rho,
+                acs_cfg.q_0,
+                acs_cfg.t_0,
+                Some(acs_cfg.seed as u128),
+                acs_cfg.ant_count,
+                inv_shortest_paths,
+            );
+            let supervisor =
+                aco::Supervisor::new(experiment_cfg.aggregation_rate, Writer::from_writer(fw));
+            let mut acs_algo = Acs::new(instance, params, supervisor);
+
+            for _i in (0..acs_cfg.iterations).progress() {
+                acs_algo.single_iteration();
+            }
+            acs_algo.supervisor.aggregate_receive();
         } else if config.algorithm.two_swap().is_ok() {
             let params = two_swap::Params::new(heuristic);
             let supervisor =
@@ -239,7 +260,7 @@ impl DynamicGraphExperiment {
             }
             random_algo.supervisor.aggregate_receive();
         } else {
-            return Err(ExperimentConfigError::InvalidGraphConfig(
+            return Err(ExperimentConfigError::InvalidAlgorithmConfig(
                 "No valid Algorithm config supplied.".to_string(),
             ));
         }

@@ -1,4 +1,5 @@
 mod aco_experiment;
+mod acs_experiment;
 mod mm_aco_experiment;
 mod random_search_experiment;
 mod two_swap_experiment;
@@ -7,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::experiment_config::{ExperimentConfigError, Fix};
 pub use aco_experiment::{AcoExperiment, UnseededAcoExperiment};
+pub use acs_experiment::{AcsExperiment, UnseededAcsExperiment};
 pub use mm_aco_experiment::{MMAcoExperiment, UnseededMMAcoExperiment};
 pub use random_search_experiment::{RandomSearchExperiment, UnseededRandomSearchExperiment};
 pub use two_swap_experiment::TwoSwapExperiment;
@@ -16,6 +18,8 @@ pub use two_swap_experiment::TwoSwapExperiment;
 pub enum AlgoConfig {
     MMAco(MMAcoExperiment),
     UnseededMMAco(UnseededMMAcoExperiment),
+    Acs(AcsExperiment),
+    UnseededAcs(UnseededAcsExperiment),
     Aco(AcoExperiment),
     UnseededAco(UnseededAcoExperiment),
     Random(RandomSearchExperiment),
@@ -37,6 +41,14 @@ impl AlgoConfig {
             AlgoConfig::MMAco(mmaco) => Ok(*mmaco),
             AlgoConfig::UnseededMMAco(usmmaco) => Ok(usmmaco.to_fixed()),
             _ => Err(ExperimentConfigError::NotMMAco),
+        }
+    }
+
+    pub fn acs(&self) -> Result<AcsExperiment, ExperimentConfigError> {
+        match self {
+            AlgoConfig::Acs(acs) => Ok(*acs),
+            AlgoConfig::UnseededAcs(usacs) => Ok(usacs.to_fixed()),
+            _ => Err(ExperimentConfigError::NotAcs),
         }
     }
 
