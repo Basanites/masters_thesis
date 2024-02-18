@@ -2,7 +2,7 @@ mod dot;
 pub mod svg;
 
 pub use dot::Dot;
-pub use svg::SVG;
+pub use svg::Svg;
 
 use crate::graph::WeightedGraph;
 use std::fmt::Display;
@@ -11,10 +11,13 @@ use std::fmt::Display;
 pub trait Export {
     /// Returns a String representation of the graph according to the export format used.
     fn from_weighted_graph<Nw: Display, Ew: Display>(
-        graph: &dyn WeightedGraph<Nw, Ew>,
+        graph: &dyn WeightedGraph<NodeWeightType = Nw, EdgeWeightType = Ew>,
         name: &str,
     ) -> String;
 
     /// Returns a String representation of the graph according to the export format used.
-    fn from_usize_weighted_graph(graph: &dyn WeightedGraph<usize, usize>, name: &str) -> String;
+    fn from_usize_weighted_graph(
+        graph: &dyn WeightedGraph<NodeWeightType = usize, EdgeWeightType = usize>,
+        name: &str,
+    ) -> String;
 }

@@ -1,89 +1,254 @@
-#![feature(test, min_specialization)]
+#![feature(
+    test,
+    min_specialization,
+    map_into_keys_values,
+    total_cmp,
+    map_first_last,
+    map_try_insert
+)]
+#![allow(dead_code)]
+mod dynamic_graph_experiment;
+mod experiment_config;
 mod geo;
 mod graph;
 mod metaheuristic;
 mod rng;
 mod util;
 
-use graph::export::SVG;
-use graph::import::import_pbf;
-use graph::{Edge, GenericWeightedGraph, WeightedGraph};
-use metaheuristic::{two_swap, Metaheuristic, ProblemInstance, TwoSwap};
-use util::Point;
+use dynamic_graph_experiment::DynamicGraphExperiment;
+use experiment_config::{
+    AlgoConfig,
+    ExperimentConfig,
+    GeneralExperimentConfig,
+    GraphCreationConfig,
+    // GraphDynamicsConfig,
+};
+use metaheuristic::Heuristic;
 
-use std::fs::File;
-use std::io::Write;
+use decorum::R64;
+use glob::glob;
+use num_traits::real::Real;
+use num_traits::{One, Zero};
+use std::env;
+use std::fs::{create_dir, write, File};
+use std::path::Path;
 
-fn main() -> std::io::Result<()> {
-    let graph = graph::MatrixGraph::new_usize_indexed(
-        vec![0.0, 0.8, 12.0, 7.0, 2.5],
-        vec![
-            (0, 1, 12.0),
-            (0, 3, 2.0),
-            (1, 0, 7.0),
-            (1, 2, 16.0),
-            (1, 3, 1.5),
-            (2, 1, 13.5),
-            (2, 4, 23.0),
-            (3, 0, 8.1),
-            (3, 1, 27.0),
-            (3, 4, 7.5),
-            (4, 1, 7.0),
-            (4, 2, 12.0),
-            (4, 3, 7.5),
-        ],
-    )
-    .unwrap();
+fn two_swap_h1(nw: R64, _ew: R64, _dist_to_start: R64, _elapsed: R64) -> R64 {
+    nw
+}
 
-    let eval: fn(f64, f64, usize, f64) -> f64 = |nw, _, _, _| nw;
-    let mut optimizer = TwoSwap::new(
-        ProblemInstance::new(&graph, 0, 100.0),
-        two_swap::Params::new(eval),
-    );
-    println!("{:?}", optimizer.current_solution());
-    for _ in 1..5 {
-        let val = optimizer.next();
-        if val.is_some() {
-            println!("{:?}", optimizer.current_solution());
-        } else {
-            break;
+fn two_swap_h2(nw: R64, ew: R64, _dist_to_start: R64, _elapsed: R64) -> R64 {
+    nw / ew
+}
+
+fn aco_h1(nw: R64, _ew: R64, _dist_to_start: R64, _elapsed: R64) -> R64 {
+    if nw != R64::zero() {
+        R64::one() - R64::one() / nw
+    } else {
+        R64::zero()
+    }
+}
+
+fn aco_h2(nw: R64, ew: R64, _dist_to_start: R64, _elapsed: R64) -> R64 {
+    if nw != R64::zero() && ew != R64::zero() {
+        // R64::one() - R64::one() / (nw / ew)
+        nw / ew
+    } else {
+        R64::zero()
+    }
+}
+
+fn aco_h3(nw: R64, _ew: R64, dist_to_start: R64, elapsed: R64) -> R64 {
+    if nw != R64::zero() && dist_to_start != R64::zero() {
+        R64::powf(R64::one() - R64::one() / nw, R64::one() - elapsed)
+            * R64::powf(R64::one() / dist_to_start, elapsed)
+    } else if nw != R64::zero() {
+        R64::powf(R64::one() - R64::one() / nw, R64::one() - elapsed)
+    } else {
+        R64::zero()
+    }
+}
+
+fn run_cfg(path: &Path, experiment_location: &str) {
+    let two_swap_functions_usize: Vec<(&Heuristic<R64, R64>, &str)> =
+        vec![(&two_swap_h1, "h1"), (&two_swap_h2, "h2")];
+    let two_swap_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> =
+        vec![(&two_swap_h1, "h1"), (&two_swap_h2, "h2")];
+
+    let aco_functions_usize: Vec<(&Heuristic<R64, R64>, &str)> =
+        vec![(&aco_h1, "h1"), (&aco_h2, "h2")];
+    let aco_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> =
+        vec![(&aco_h1, "h1"), (&aco_h2, "h2"), (&aco_h3, "h3")];
+
+    let random_functions_usize: Vec<(&Heuristic<R64, R64>, &str)> = vec![(&aco_h2, "h2")];
+    let random_functions_geo: Vec<(&Heuristic<R64, R64>, &str)> = vec![(&aco_h2, "h2")];
+    let entry = path;
+    let stem = entry.file_stem().unwrap().to_str().unwrap();
+
+    println!("\n---------------------------------------------------");
+    println!("Running config {}: ", stem);
+    let reader = File::open(entry).unwrap();
+    let experiment = serde_yaml::from_reader::<File, ExperimentConfig>(reader);
+    let mut experiment = match experiment {
+        Ok(val) => val,
+        Err(e) => {
+            eprintln!("{}", e);
+            return;
         }
+    };
+
+    // update all cfg entries to their full versions
+    let general_cfg = GeneralExperimentConfig::Full(experiment.experiment.cfg());
+    let algo_cfg = if let Ok(two) = experiment.algorithm.two_swap() {
+        AlgoConfig::TwoSwap(two)
+    } else if let Ok(mmaco) = experiment.algorithm.mm_aco() {
+        AlgoConfig::MMAco(mmaco)
+    } else if let Ok(acs) = experiment.algorithm.acs() {
+        AlgoConfig::Acs(acs)
+    } else if let Ok(aco) = experiment.algorithm.aco() {
+        AlgoConfig::Aco(aco)
+    } else if let Ok(random) = experiment.algorithm.random() {
+        AlgoConfig::Random(random)
+    } else {
+        eprintln!("Invalid Algorithm config for {}", entry.to_str().unwrap());
+        return;
+    };
+    let graph_creation_cfg = if let Ok(f) = experiment.graph_creation.file() {
+        GraphCreationConfig::File(f)
+    } else if let Ok(g) = experiment.graph_creation.grid() {
+        GraphCreationConfig::Grid(g)
+    } else if let Ok(e) = experiment.graph_creation.erdos_renyi() {
+        GraphCreationConfig::ErdosRenyi(e)
+    } else {
+        eprintln!(
+            "Invalid Graph Creation config for {}",
+            entry.to_str().unwrap()
+        );
+        return;
+    };
+    // let graph_dynamics_cfg = GraphDynamicsConfig::Full(experiment.graph_dynamics.cfg());
+
+    // write full version to cfg for later usage
+    experiment.experiment = general_cfg;
+    experiment.algorithm = algo_cfg;
+    experiment.graph_creation = graph_creation_cfg;
+    // experiment.graph_dynamics = graph_dynamics_cfg;
+    let par_string = serde_yaml::to_string(&experiment).unwrap();
+    println!("{}", par_string);
+    let res = write(entry, par_string.as_bytes());
+    if let Err(e) = res {
+        eprintln!("{}", e);
     }
 
-    // let mapped_graph = import_pbf("res/Leipzig_rough_center.osm.pbf");
-    //
-    // let mut start_points = Vec::new();
-    // for (from, to) in mapped_graph.iter_edge_ids() {
-    //     if mapped_graph.has_edge((to, from)) {
-    //         start_points.push(from);
-    //     }
-    // }
-    //
-    // let eval: fn((Point, usize), f64) -> f64 = |nw, ew| nw.1 as f64 / ew;
-    // for start_point in start_points {
-    //     let mut optimizer = TwoSwap::new(Box::new(mapped_graph.clone()), start_point, 100.0, &eval);
-    //
-    //     let mut val;
-    //     for i in 1..10 {
-    //         val = optimizer.next();
-    //         if val.is_some() {
-    //             println!("{:?}", val);
-    //         } else {
-    //             break
-    //         }
-    //     }
-    //     println!();
-    // }
-    //
-    // let svg_exporter = SVG {
-    //     width: 2000,
-    //     height: 1000,
-    //     padding: 50,
-    // };
-    //
-    // println!("{}", svg_exporter.from_coordinate_graph(&mapped_graph as &dyn WeightedGraph<(Point, usize), usize>, "Leipzig"));
-    // let mut out_file = File::create("graph_out.svg").expect("Error creating file");
-    // out_file.write_all(svg_exporter.export_coordinate_graph(&mapped_graph as &dyn WeightedGraph<(Point, usize), f64>, "Leipzig").as_bytes()).expect("Error writing to file");
+    // create directory for log storage
+    let log_folder = Path::new(experiment_location).join(stem);
+    let _res = create_dir(&log_folder);
 
-    Ok(())
+    if experiment.algorithm.two_swap().is_ok() {
+        if experiment.graph_creation.file().is_ok() {
+            for (heuristic, name) in two_swap_functions_geo.iter() {
+                println!("Running heuristic {}", name);
+                let file = log_folder.join(name);
+                let res = DynamicGraphExperiment::run_geopoint_config(
+                    &experiment,
+                    heuristic,
+                    file.to_str().unwrap(),
+                );
+                if let Err(e) = res {
+                    eprintln!("{}", e);
+                }
+            }
+        } else {
+            for (heuristic, name) in two_swap_functions_usize.iter() {
+                println!("Running heuristic {}", name);
+                let file = log_folder.join(name);
+                let res = DynamicGraphExperiment::run_usize_config(
+                    &experiment,
+                    heuristic,
+                    file.to_str().unwrap(),
+                );
+                if let Err(e) = res {
+                    eprintln!("{}", e);
+                }
+            }
+        }
+    } else if experiment.algorithm.aco().is_ok()
+        || experiment.algorithm.acs().is_ok()
+        || experiment.algorithm.mm_aco().is_ok()
+    {
+        if experiment.graph_creation.file().is_ok() {
+            for (heuristic, name) in aco_functions_geo.iter() {
+                println!("Running heuristic {}", name);
+                let file = log_folder.join(name);
+                let res = DynamicGraphExperiment::run_geopoint_config(
+                    &experiment,
+                    heuristic,
+                    file.to_str().unwrap(),
+                );
+                if let Err(e) = res {
+                    eprintln!("{}", e);
+                }
+            }
+        } else {
+            for (heuristic, name) in aco_functions_usize.iter() {
+                println!("Running heuristic {}", name);
+                let file = log_folder.join(name);
+                let res = DynamicGraphExperiment::run_usize_config(
+                    &experiment,
+                    heuristic,
+                    file.to_str().unwrap(),
+                );
+                if let Err(e) = res {
+                    eprintln!("{}", e);
+                }
+            }
+        }
+    } else if experiment.algorithm.random().is_ok() {
+        if experiment.graph_creation.file().is_ok() {
+            for (heuristic, name) in random_functions_geo.iter() {
+                println!("Running heuristic {}", name);
+                let file = log_folder.join(name);
+                let res = DynamicGraphExperiment::run_geopoint_config(
+                    &experiment,
+                    heuristic,
+                    file.to_str().unwrap(),
+                );
+                if let Err(e) = res {
+                    eprintln!("{}", e);
+                }
+            }
+        } else {
+            for (heuristic, name) in random_functions_usize.iter() {
+                println!("Running heuristic {}", name);
+                let file = log_folder.join(name);
+                let res = DynamicGraphExperiment::run_usize_config(
+                    &experiment,
+                    heuristic,
+                    file.to_str().unwrap(),
+                );
+                if let Err(e) = res {
+                    eprintln!("{}", e);
+                }
+            }
+        }
+    }
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let mut experiment_location = "./experiments";
+
+    if args.len() > 1 {
+        let path = Path::new(&args[1]);
+        if args.len() > 2 {
+            experiment_location = &args[2];
+        }
+        run_cfg(&path, &experiment_location);
+    } else {
+        for entry in glob(format!("{}/*.yaml", experiment_location).as_str())
+            .expect("Failed to read glob pattern")
+        {
+            run_cfg(&entry.unwrap(), &experiment_location);
+        }
+    }
 }

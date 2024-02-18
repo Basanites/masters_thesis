@@ -7,13 +7,13 @@ use std::io::prelude::*;
 use tera::Context;
 use tera::Tera;
 
-pub struct SVG {
+pub struct Svg {
     pub width: usize,
     pub height: usize,
     pub padding: usize,
 }
 
-impl SVG {
+impl Svg {
     fn scaled_point(&self, point: &Point, scaler: &PointScaler) -> Point {
         let scaled_point = scaler.scale_point(point);
 
@@ -27,9 +27,9 @@ impl SVG {
     fn scaled_geopoint(&self, point: &GeoPoint, scaler: &GeoPointScaler) -> GeoPoint {
         let scaled_point = scaler.scale_point(point);
         GeoPoint::from_micro_degrees(
-            (scaled_point.micro_lat() * self.width as i64) + self.padding as i64,
-            (scaled_point.micro_lon() * (-(self.height as i64)))
-                + (self.padding + self.height) as i64,
+            (scaled_point.micro_lat() * self.width as i32) + self.padding as i32,
+            (scaled_point.micro_lon() * (-(self.height as i32)))
+                + (self.padding + self.height) as i32,
         )
     }
 
@@ -45,7 +45,7 @@ impl SVG {
 
     pub fn export_coordinate_graph<Nw, Ew>(
         &self,
-        graph: &dyn WeightedGraph<(Point, Nw), Ew>,
+        graph: &dyn WeightedGraph<NodeWeightType = (Point, Nw), EdgeWeightType = Ew>,
         name: &str,
     ) -> String {
         let mut context = self.initial_context();
@@ -78,7 +78,11 @@ impl SVG {
         Tera::one_off(&template, &context, true).expect("Could not draw graph")
     }
 
-    pub fn export_geo_graph<Nw, Ew>(&self, graph: &dyn GeoGraph<Nw, Ew>, name: &str) -> String {
+    pub fn export_geo_graph<Nw, Ew>(
+        &self,
+        graph: &dyn GeoGraph<NodeWeightType = Nw, EdgeWeightType = Ew>,
+        name: &str,
+    ) -> String {
         let mut context = self.initial_context();
         context.insert("name", &name);
 

@@ -1,35 +1,62 @@
 pub mod aco;
+pub mod acs;
+pub mod mm_aco;
+pub mod random_search;
 mod solution;
+pub mod supervisor;
 pub mod two_swap;
 
-use crate::graph::GenericWeightedGraph;
-pub use aco::ACO;
-pub use solution::{solution_length, Solution, SolutionError};
+pub use aco::Aco;
+pub use acs::Acs;
+pub use mm_aco::MMAco;
+pub use random_search::RandomSearch;
+pub use solution::{solution_length, solution_score, Solution, SolutionError};
 pub use two_swap::TwoSwap;
 
-pub type Heuristic<IndexType, Nw, Ew> = fn(
-    to_node_weight: Nw,
-    edge_to_node_weight: Ew,
-    to_node_id: IndexType,
-    elapsed_time_ratio_until: Ew,
-) -> f64;
+use decorum::R64;
+use std::cell::RefCell;
 
-pub trait Metaheuristic<'a, Params, IndexType, Nw, Ew> {
-    fn new(problem: ProblemInstance<'a, IndexType, Nw, Ew>, params: Params) -> Self;
+use crate::graph::GenericWeightedGraph;
+
+pub type Heuristic<Nw, Ew> = dyn Fn(Nw, Ew, R64, Ew) -> R64;
+
+pub trait Metaheuristic<'a, IndexType, NodeWeightType, EdgeWeightType> {
+    type Params;
+    type SupervisorType;
+
+    fn new(
+        problem: ProblemInstance<'a, IndexType, NodeWeightType, EdgeWeightType>,
+        params: Self::Params,
+        supervisor: Self::SupervisorType,
+    ) -> Self;
     fn single_iteration(&mut self) -> Option<&Solution<IndexType>>;
 }
 
-pub struct ProblemInstance<'a, IndexType, Nw, Ew> {
-    graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
+pub struct ProblemInstance<'a, IndexType, NodeWeightType, EdgeWeightType> {
+    graph: &'a RefCell<
+        dyn GenericWeightedGraph<
+            IndexType = IndexType,
+            NodeWeightType = NodeWeightType,
+            EdgeWeightType = EdgeWeightType,
+        >,
+    >,
     goal_point: IndexType,
-    max_time: Ew,
+    max_time: EdgeWeightType,
 }
 
-impl<'a, IndexType, Nw, Ew> ProblemInstance<'a, IndexType, Nw, Ew> {
+impl<'a, IndexType, NodeWeightType, EdgeWeightType>
+    ProblemInstance<'a, IndexType, NodeWeightType, EdgeWeightType>
+{
     pub fn new(
-        graph: &'a dyn GenericWeightedGraph<IndexType, Nw, Ew>,
+        graph: &'a RefCell<
+            dyn GenericWeightedGraph<
+                IndexType = IndexType,
+                NodeWeightType = NodeWeightType,
+                EdgeWeightType = EdgeWeightType,
+            >,
+        >,
         goal_point: IndexType,
-        max_time: Ew,
+        max_time: EdgeWeightType,
     ) -> Self {
         ProblemInstance {
             graph,

@@ -1,0 +1,16 @@
+---
+experiment:
+  finished: false
+  seed: 0
+  aggregation_rate: 1
+  max_time: 480.0
+algorithm:
+  seed: 0
+  iterations: 10
+graph_creation:
+  filename: instances/Frankfurt.osm.pbf
+  seed: 0
+  nw_range:
+    - 1.0
+    - 100.0
+  node_weight_probability: 0.4

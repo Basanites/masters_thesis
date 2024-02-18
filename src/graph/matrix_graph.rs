@@ -1,10 +1,14 @@
-use std::cmp::Eq;
-use std::collections::HashMap;
+use num_traits::Zero;
+use std::cmp::{Eq, Ord, Ordering};
+use std::collections::{BTreeMap, BinaryHeap};
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::marker::PhantomData;
+use std::ops::Add;
 
-use crate::geo::GeoPoint;
-use crate::graph::{Edge, GenericWeightedGraph, GeoGraph, GraphError, WeightedGraph};
+use crate::graph::{Edge, GenericWeightedGraph, GraphError};
+use crate::metaheuristic::Solution;
+use crate::util::Max;
 
 #[derive(Debug, Clone)]
 pub struct MatrixGraph<IndexType: Clone, Nw, Ew> {
@@ -12,8 +16,8 @@ pub struct MatrixGraph<IndexType: Clone, Nw, Ew> {
     node_weights: Vec<Option<Nw>>,
     order: usize,
     size: usize,
-    node_map: HashMap<IndexType, usize>,
-    inv_node_map: HashMap<usize, IndexType>,
+    node_map: BTreeMap<IndexType, usize>,
+    inv_node_map: BTreeMap<usize, IndexType>,
     phantom: PhantomData<IndexType>,
 }
 
@@ -37,8 +41,8 @@ impl<Nw: Clone, Ew: Clone> MatrixGraph<usize, Nw, Ew> {
             node_weights: nodes.into_iter().map(Some).collect(),
             order: node_amount,
             size: edges.len(),
-            node_map: HashMap::new(),
-            inv_node_map: HashMap::new(),
+            node_map: BTreeMap::new(),
+            inv_node_map: BTreeMap::new(),
             phantom: PhantomData,
         };
 
@@ -56,58 +60,58 @@ impl<Nw: Clone, Ew: Clone> MatrixGraph<usize, Nw, Ew> {
     }
 }
 
-#[allow(dead_code)]
-impl MatrixGraph<usize, (), ()> {
-    /// Constructs an unweighted MatrixGraph using the given amount of nodes and list of edges.
-    pub fn new_unweighted(nodes: usize, edges: &[Edge<usize>]) -> Result<Self, GraphError<usize>> {
-        // initialization works basically the same way as for generic types.
-        let mut graph = MatrixGraph {
-            adjacency_matrix: (0..nodes).map(|_| vec![None; nodes]).collect(),
-            node_weights: vec![Some(()); nodes],
-            order: nodes,
-            size: edges.len(),
-            node_map: HashMap::new(),
-            inv_node_map: HashMap::new(),
-            phantom: PhantomData,
-        };
+// #[allow(dead_code)]
+// impl MatrixGraph<usize, (), ()> {
+//     /// Constructs an unweighted MatrixGraph using the given amount of nodes and list of edges.
+//     pub fn new_unweighted(nodes: usize, edges: &[Edge<usize>]) -> Result<Self, GraphError<usize>> {
+//         // initialization works basically the same way as for generic types.
+//         let mut graph = MatrixGraph {
+//             adjacency_matrix: (0..nodes).map(|_| vec![None; nodes]).collect(),
+//             node_weights: vec![Some(()); nodes],
+//             order: nodes,
+//             size: edges.len(),
+//             node_map: BTreeMap::new(),
+//             inv_node_map: BTreeMap::new(),
+//             phantom: PhantomData,
+//         };
 
-        // A lot of places where to_owned is used. Could possibly be simplified.
-        for (from, to) in edges.iter() {
-            if from >= &nodes {
-                return Err(GraphError::MissingNode(*from));
-            } else if to >= &nodes {
-                return Err(GraphError::MissingNode(*to));
-            }
+//         // A lot of places where to_owned is used. Could possibly be simplified.
+//         for (from, to) in edges.iter() {
+//             if from >= &nodes {
+//                 return Err(GraphError::MissingNode(*from));
+//             } else if to >= &nodes {
+//                 return Err(GraphError::MissingNode(*to));
+//             }
 
-            graph.adjacency_matrix[*from][*to] = Some(());
-        }
+//             graph.adjacency_matrix[*from][*to] = Some(());
+//         }
 
-        Ok(graph)
-    }
+//         Ok(graph)
+//     }
 
-    /// Constructs an empty unweighted MatrixGraph.
-    pub fn default_unweighted() -> Self {
-        MatrixGraph::default()
-    }
+//     /// Constructs an empty unweighted MatrixGraph.
+//     pub fn default_unweighted() -> Self {
+//         MatrixGraph::default()
+//     }
 
-    /// Constructs an unweighted MatrixGraph with capacity for at least the given amount of nodes.
-    pub fn unweighted_with_size(size: usize) -> Self {
-        MatrixGraph::with_size(size)
-    }
-}
+//     /// Constructs an unweighted MatrixGraph with capacity for at least the given amount of nodes.
+//     pub fn unweighted_with_size(size: usize) -> Self {
+//         MatrixGraph::with_size(size)
+//     }
+// }
 
 impl<IndexType, Nw, Ew> MatrixGraph<IndexType, Nw, Ew>
 where
-    IndexType: Hash + Copy + Eq,
+    IndexType: Hash + Copy + Eq + Display + Debug + Ord,
     Nw: Copy,
-    Ew: Copy,
+    Ew: Copy + Max + Zero + Add + Debug + Ord,
 {
     pub fn new(
         nodes: Vec<(IndexType, Nw)>,
         edges: Vec<(Edge<IndexType>, Ew)>,
     ) -> Result<Self, GraphError<IndexType>> {
-        let mut node_map = HashMap::new();
-        let mut inv_node_map = HashMap::new();
+        let mut node_map = BTreeMap::new();
+        let mut inv_node_map = BTreeMap::new();
         for (i, loc) in nodes.iter().enumerate() {
             node_map.insert(loc.0, i);
             inv_node_map.insert(i, loc.0);
@@ -153,10 +157,11 @@ where
         }
     }
 
+    #[allow(dead_code)]
     fn cast_usize_to_generic_graph(
         ugraph: MatrixGraph<usize, Nw, Ew>,
-        nmap: HashMap<IndexType, usize>,
-        imap: HashMap<usize, IndexType>,
+        nmap: BTreeMap<IndexType, usize>,
+        imap: BTreeMap<usize, IndexType>,
     ) -> MatrixGraph<IndexType, Nw, Ew> {
         MatrixGraph {
             adjacency_matrix: ugraph.adjacency_matrix,
@@ -178,8 +183,8 @@ where
             node_weights: Vec::new(),
             order: 0,
             size: 0,
-            node_map: HashMap::new(),
-            inv_node_map: HashMap::new(),
+            node_map: BTreeMap::new(),
+            inv_node_map: BTreeMap::new(),
             phantom: PhantomData,
         }
     }
@@ -191,8 +196,8 @@ where
             node_weights: vec![None; size],
             order: 0,
             size: 0,
-            node_map: HashMap::with_capacity(size),
-            inv_node_map: HashMap::with_capacity(size),
+            node_map: BTreeMap::new(),
+            inv_node_map: BTreeMap::new(),
             phantom: PhantomData,
         }
     }
@@ -302,6 +307,25 @@ where
                 .enumerate()
                 .filter(|(_, x)| x.is_some())
                 .map(move |(i, _)| (i, self._edge_weight((id, i)).unwrap())),
+        ))
+    }
+
+    fn _iter_inv_neighbors(
+        &self,
+        id: usize,
+    ) -> Result<Box<dyn Iterator<Item = (usize, &Ew)> + '_>, GraphError<usize>> {
+        if !self._has_node(id) {
+            return Err(GraphError::MissingNode(id));
+        }
+
+        // Get the ids of nodes to which a weighted edge from id exists.
+        Ok(Box::new(
+            self.adjacency_matrix
+                .iter()
+                .map(move |col| col[id])
+                .enumerate()
+                .filter(|(_, x)| x.is_some())
+                .map(move |(i, _)| (i, self._edge_weight((i, id)).unwrap())),
         ))
     }
 
@@ -444,15 +468,147 @@ where
             self._add_edge(edge, weight)
         }
     }
+
+    fn _inv_shortest_paths(&self, from_node: usize) -> (Vec<Option<usize>>, Vec<Ew>) {
+        // dist[node] = current shortest distance from `start` to `node`
+        let node_count = self.adjacency_matrix.len();
+        let mut dist: Vec<_> = (0..node_count).map(|_| <Ew as Max>::max()).collect();
+
+        let mut prev: Vec<Option<usize>> = vec![None; node_count];
+        let mut visited: Vec<bool> = vec![false; node_count];
+
+        let mut heap: BinaryHeap<State<usize, Ew>> = BinaryHeap::with_capacity(node_count);
+
+        // We're at `start`, with a zero cost
+        dist[from_node] = Ew::zero();
+        prev[from_node] = Some(from_node);
+        heap.push(State {
+            cost: Ew::zero(),
+            position: from_node,
+        });
+
+        // Examine the frontier with lower cost nodes first (min-heap)
+        while let Some(State { cost, position }) = heap.pop() {
+            // Important as we may have already found a better way
+            if visited[position] || cost > dist[position] {
+                continue;
+            }
+
+            visited[position] = true;
+
+            // For each node we can reach, see if we can find a way with
+            // a lower cost going through this node
+            for (other, &cost_from) in self._iter_inv_neighbors(position).unwrap() {
+                let next = State {
+                    cost: cost + cost_from,
+                    position: other,
+                };
+
+                // If so, add it to the frontier and continue
+                if next.cost < dist[other] {
+                    if !visited[other] {
+                        heap.push(next);
+                    }
+                    // Relaxation, we have now found a better way
+                    dist[other] = next.cost;
+                    prev[other] = Some(position);
+                }
+            }
+        }
+
+        (prev, dist)
+    }
+
+    fn _shortest_paths(&self, from_node: usize) -> (Vec<Option<usize>>, Vec<Ew>) {
+        // dist[node] = current shortest distance from `start` to `node`
+        let node_count = self.adjacency_matrix.len();
+        let mut dist: Vec<_> = (0..node_count).map(|_| <Ew as Max>::max()).collect();
+
+        let mut prev: Vec<Option<usize>> = vec![None; node_count];
+        let mut visited: Vec<bool> = vec![false; node_count];
+
+        let mut heap: BinaryHeap<State<usize, Ew>> = BinaryHeap::with_capacity(node_count);
+
+        // We're at `start`, with a zero cost
+        dist[from_node] = Ew::zero();
+        prev[from_node] = Some(from_node);
+        heap.push(State {
+            cost: Ew::zero(),
+            position: from_node,
+        });
+
+        // Examine the frontier with lower cost nodes first (min-heap)
+        while let Some(State { cost, position }) = heap.pop() {
+            // Important as we may have already found a better way
+            if visited[position] || cost > dist[position] {
+                continue;
+            }
+
+            visited[position] = true;
+
+            // For each node we can reach, see if we can find a way with
+            // a lower cost going through this node
+            for (other, &cost_to) in self._iter_neighbors(position).unwrap() {
+                let next = State {
+                    cost: cost + cost_to,
+                    position: other,
+                };
+
+                // If so, add it to the frontier and continue
+                if next.cost < dist[other] {
+                    if !visited[other] {
+                        heap.push(next);
+                    }
+                    // Relaxation, we have now found a better way
+                    dist[other] = next.cost;
+                    prev[other] = Some(position);
+                }
+            }
+        }
+
+        (prev, dist)
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct State<IndexType, CostType> {
+    cost: CostType,
+    position: IndexType,
+}
+
+// The priority queue depends on `Ord`.
+// Explicitly implement the trait so the queue becomes a min-heap
+// instead of a max-heap.
+impl<IndexType: Ord, CostType: Ord> Ord for State<IndexType, CostType> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Notice that the we flip the ordering on costs.
+        // In case of a tie we compare positions - this step is necessary
+        // to make implementations of `PartialEq` and `Ord` consistent.
+        other
+            .cost
+            .cmp(&self.cost)
+            .then_with(|| self.position.cmp(&other.position))
+    }
+}
+
+// `PartialOrd` needs to be implemented as well.
+impl<IndexType: Ord, CostType: Ord> PartialOrd for State<IndexType, CostType> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[allow(dead_code, clippy::map_entry)]
-impl<IndexType, Nw, Ew> GenericWeightedGraph<IndexType, Nw, Ew> for MatrixGraph<IndexType, Nw, Ew>
+impl<IndexType, Nw, Ew> GenericWeightedGraph for MatrixGraph<IndexType, Nw, Ew>
 where
-    IndexType: Hash + Copy + Eq,
+    IndexType: Hash + Copy + Eq + Display + Debug + Ord,
     Nw: Copy,
-    Ew: Copy,
+    Ew: Copy + Max + Zero + Add + Debug + Ord,
 {
+    type IndexType = IndexType;
+    type NodeWeightType = Nw;
+    type EdgeWeightType = Ew;
+
     default fn is_empty(&self) -> bool {
         self._is_empty()
     }
@@ -469,18 +625,23 @@ where
         Box::new(self.node_map.keys().copied())
     }
 
-    default fn node_ids(&self) -> Vec<IndexType> {
+    default fn node_ids(&self) -> Vec<Self::IndexType> {
         self.iter_node_ids().collect()
     }
 
-    default fn iter_nodes(&self) -> Box<dyn Iterator<Item = (IndexType, &Nw)> + '_> {
+    default fn iter_nodes(
+        &self,
+    ) -> Box<dyn Iterator<Item = (Self::IndexType, &Self::NodeWeightType)> + '_> {
         Box::new(
             self._iter_nodes()
                 .map(move |(id, node)| (self.inv_node_map[&id], node)),
         )
     }
 
-    default fn node_weight(&self, id: IndexType) -> Result<&Nw, GraphError<IndexType>> {
+    default fn node_weight(
+        &self,
+        id: Self::IndexType,
+    ) -> Result<&Self::NodeWeightType, GraphError<Self::IndexType>> {
         if !self.node_map.contains_key(&id) {
             return Err(GraphError::MissingNode(id));
         }
@@ -491,8 +652,8 @@ where
 
     default fn iter_neighbor_ids(
         &self,
-        id: IndexType,
-    ) -> Result<Box<dyn Iterator<Item = IndexType> + '_>, GraphError<IndexType>> {
+        id: Self::IndexType,
+    ) -> Result<Box<dyn Iterator<Item = Self::IndexType> + '_>, GraphError<Self::IndexType>> {
         if !self.node_map.contains_key(&id) {
             return Err(GraphError::MissingNode(id));
         }
@@ -505,7 +666,10 @@ where
         }
     }
 
-    default fn neighbor_ids(&self, id: IndexType) -> Result<Vec<IndexType>, GraphError<IndexType>> {
+    default fn neighbor_ids(
+        &self,
+        id: Self::IndexType,
+    ) -> Result<Vec<Self::IndexType>, GraphError<Self::IndexType>> {
         let res = self.iter_neighbor_ids(id);
         match res {
             Ok(iterator) => Ok(iterator.collect()),
@@ -516,8 +680,11 @@ where
     #[allow(clippy::type_complexity)]
     default fn iter_neighbors(
         &self,
-        id: IndexType,
-    ) -> Result<Box<dyn Iterator<Item = (IndexType, &Ew)> + '_>, GraphError<IndexType>> {
+        id: Self::IndexType,
+    ) -> Result<
+        Box<dyn Iterator<Item = (Self::IndexType, &Self::EdgeWeightType)> + '_>,
+        GraphError<Self::IndexType>,
+    > {
         let inner = self._iter_neighbors(self.node_map[&id]);
         let res = self.mapped_result(inner);
         match res {
@@ -530,8 +697,8 @@ where
 
     default fn neighbors(
         &self,
-        id: IndexType,
-    ) -> Result<Vec<(IndexType, &Ew)>, GraphError<IndexType>> {
+        id: Self::IndexType,
+    ) -> Result<Vec<(Self::IndexType, &Self::EdgeWeightType)>, GraphError<Self::IndexType>> {
         let res = self.iter_neighbors(id);
         match res {
             Ok(iter) => Ok(iter.collect()),
@@ -539,11 +706,15 @@ where
         }
     }
 
-    default fn has_node(&self, id: IndexType) -> bool {
+    default fn has_node(&self, id: Self::IndexType) -> bool {
         self.node_map.contains_key(&id) && self._has_node(self.node_map[&id])
     }
 
-    default fn add_node(&mut self, id: IndexType, weight: Nw) -> Result<(), GraphError<IndexType>> {
+    default fn add_node(
+        &mut self,
+        id: Self::IndexType,
+        weight: Self::NodeWeightType,
+    ) -> Result<(), GraphError<Self::IndexType>> {
         if self.node_map.contains_key(&id) {
             return Err(GraphError::DuplicateNode(id));
         }
@@ -562,7 +733,7 @@ where
         }
     }
 
-    default fn remove_node(&mut self, id: IndexType) {
+    default fn remove_node(&mut self, id: Self::IndexType) {
         if let Some(&inner_id) = self.node_map.get(&id) {
             self.node_map.remove(&id);
             self.inv_node_map.remove(&inner_id);
@@ -570,7 +741,7 @@ where
         }
     }
 
-    default fn change_node(&mut self, id: IndexType, weight: Nw) {
+    default fn change_node(&mut self, id: Self::IndexType, weight: Self::NodeWeightType) {
         if self.node_map.contains_key(&id) {
             self._change_node(self.node_map[&id], weight);
         } else {
@@ -580,7 +751,7 @@ where
         }
     }
 
-    default fn degree(&self, id: IndexType) -> Result<usize, GraphError<IndexType>> {
+    default fn degree(&self, id: Self::IndexType) -> Result<usize, GraphError<Self::IndexType>> {
         if !self.node_map.contains_key(&id) {
             return Err(GraphError::MissingNode(id));
         }
@@ -589,37 +760,46 @@ where
         self.mapped_result(degree)
     }
 
-    default fn iter_edge_ids(&self) -> Box<dyn Iterator<Item = Edge<IndexType>> + '_> {
+    default fn iter_edge_ids(&self) -> Box<dyn Iterator<Item = Edge<Self::IndexType>> + '_> {
         Box::new(
             self._iter_edge_ids()
                 .map(move |(f_id, t_id)| (self.inv_node_map[&f_id], self.inv_node_map[&t_id])),
         )
     }
 
-    default fn edge_ids(&self) -> Vec<Edge<IndexType>> {
+    default fn edge_ids(&self) -> Vec<Edge<Self::IndexType>> {
         self.iter_edge_ids().collect()
     }
 
-    default fn iter_edges(&self) -> Box<dyn Iterator<Item = (Edge<IndexType>, &Ew)> + '_> {
+    default fn iter_edges(
+        &self,
+    ) -> Box<dyn Iterator<Item = (Edge<Self::IndexType>, &Self::EdgeWeightType)> + '_> {
         Box::new(self._iter_edges().map(move |((f_id, t_id), weight)| {
             ((self.inv_node_map[&f_id], self.inv_node_map[&t_id]), weight)
         }))
     }
 
-    default fn edge_weight(&self, edge: Edge<IndexType>) -> Result<&Ew, GraphError<IndexType>> {
+    default fn edges(&self) -> Vec<(Edge<Self::IndexType>, &Self::EdgeWeightType)> {
+        self.iter_edges().collect()
+    }
+
+    default fn edge_weight(
+        &self,
+        edge: Edge<Self::IndexType>,
+    ) -> Result<&Self::EdgeWeightType, GraphError<Self::IndexType>> {
         let weight = self._edge_weight((self.node_map[&edge.0], self.node_map[&edge.1]));
         self.mapped_result(weight)
     }
 
-    default fn has_edge(&self, edge: Edge<IndexType>) -> bool {
+    default fn has_edge(&self, edge: Edge<Self::IndexType>) -> bool {
         self._has_edge((self.node_map[&edge.0], self.node_map[&edge.1]))
     }
 
     default fn add_edge(
         &mut self,
-        edge: Edge<IndexType>,
+        edge: Edge<Self::IndexType>,
         weight: Ew,
-    ) -> Result<(), GraphError<IndexType>> {
+    ) -> Result<(), GraphError<Self::IndexType>> {
         if !self.node_map.contains_key(&edge.0) {
             return Err(GraphError::MissingNode(edge.0));
         } else if !self.node_map.contains_key(&edge.1) {
@@ -629,21 +809,105 @@ where
         self.mapped_result(edge)
     }
 
-    default fn remove_edge(&mut self, edge: Edge<IndexType>) {
+    default fn remove_edge(&mut self, edge: Edge<Self::IndexType>) {
         self._remove_edge((self.node_map[&edge.0], self.node_map[&edge.1]));
     }
 
     default fn change_edge(
         &mut self,
-        edge: Edge<IndexType>,
-        weight: Ew,
-    ) -> Result<(), GraphError<IndexType>> {
+        edge: Edge<Self::IndexType>,
+        weight: Self::EdgeWeightType,
+    ) -> Result<(), GraphError<Self::IndexType>> {
         let edge = self._change_edge((self.node_map[&edge.0], self.node_map[&edge.1]), weight);
         self.mapped_result(edge)
     }
+
+    default fn shortest_paths(
+        &self,
+        from_node: Self::IndexType,
+    ) -> BTreeMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+        let (prevs, dists) = self._shortest_paths(self.node_map[&from_node]);
+        let mut res = BTreeMap::new();
+
+        for i in 0..prevs.len() {
+            let mut created = false;
+            let mut solution: Solution<Self::IndexType> =
+                Solution::from_nodes(vec![self.inv_node_map[&i]]);
+            let mut prev = prevs[i];
+            while let Some(node) = prev {
+                created = true;
+
+                // only push self once (probably only important for to_node)
+                if i != node {
+                    solution.push_node(self.inv_node_map[&node]);
+                }
+
+                let n_prev = prevs[node];
+                // only to_node has prev[node] == node so we iterate as long as we haven't reached that
+                if n_prev != prev {
+                    prev = n_prev
+                } else {
+                    prev = None
+                }
+            }
+
+            // the solution needs to be reversed for us to start at the from_node
+            solution.reverse();
+
+            if created {
+                res.insert(self.inv_node_map[&i], Some((solution, dists[i])));
+            } else {
+                res.insert(self.inv_node_map[&i], None);
+            }
+        }
+
+        res
+    }
+
+    default fn inv_shortest_paths(
+        &self,
+        to_node: Self::IndexType,
+    ) -> BTreeMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+        let (prevs, dists) = self._inv_shortest_paths(self.node_map[&to_node]);
+        let mut res = BTreeMap::new();
+
+        for i in 0..prevs.len() {
+            let mut created = false;
+            let mut solution: Solution<Self::IndexType> =
+                Solution::from_nodes(vec![self.inv_node_map[&i]]);
+            let mut prev = prevs[i];
+            while let Some(node) = prev {
+                created = true;
+
+                // only push self once (probably only important for to_node)
+                if i != node {
+                    solution.push_node(self.inv_node_map[&node]);
+                }
+
+                let n_prev = prevs[node];
+                // only to_node has prev[node] == node so we iterate as long as we haven't reached that
+                if n_prev != prev {
+                    prev = n_prev
+                } else {
+                    prev = None
+                }
+            }
+            if created {
+                res.insert(self.inv_node_map[&i], Some((solution, dists[i])));
+            } else {
+                res.insert(self.inv_node_map[&i], None);
+            }
+        }
+
+        res
+    }
 }
 
-impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<usize, Nw, Ew> {
+impl<Nw: Copy, Ew> GenericWeightedGraph for MatrixGraph<usize, Nw, Ew>
+where
+    Nw: Copy,
+    Ew: Copy + Max + Zero + Add + Debug + Ord,
+{
     fn iter_node_ids(&self) -> Box<dyn Iterator<Item = usize> + '_> {
         self._iter_node_ids()
     }
@@ -717,11 +981,91 @@ impl<Nw: Copy, Ew: Copy> GenericWeightedGraph<usize, Nw, Ew> for MatrixGraph<usi
     fn change_edge(&mut self, edge: Edge<usize>, weight: Ew) -> Result<(), GraphError<usize>> {
         self._change_edge(edge, weight)
     }
+
+    fn shortest_paths(
+        &self,
+        from_node: usize,
+    ) -> BTreeMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+        let (prevs, dists) = self._shortest_paths(from_node);
+        let mut res = BTreeMap::new();
+
+        for i in 0..prevs.len() {
+            let mut created = false;
+            let mut solution: Solution<Self::IndexType> = Solution::from_nodes(vec![i]);
+            let mut prev = prevs[i];
+            while let Some(node) = prev {
+                created = true;
+
+                // only push self once (probably only important for to_node)
+                if i != node {
+                    solution.push_node(node);
+                }
+
+                let n_prev = prevs[node];
+                // only to_node has prev[node] == node so we iterate as long as we haven't reached that
+                if n_prev != prev {
+                    prev = n_prev
+                } else {
+                    prev = None
+                }
+            }
+
+            // the solution needs to be reversed for us to start at the from_node
+            solution.reverse();
+
+            // if we can reach the node we created a solution
+            if created {
+                res.insert(i, Some((solution, dists[i])));
+            } else {
+                res.insert(i, None);
+            }
+        }
+
+        res
+    }
+
+    fn inv_shortest_paths(
+        &self,
+        to_node: usize,
+    ) -> BTreeMap<Self::IndexType, Option<(Solution<Self::IndexType>, Ew)>> {
+        let (prevs, dists) = self._inv_shortest_paths(to_node);
+        let mut res = BTreeMap::new();
+
+        for i in 0..prevs.len() {
+            let mut created = false;
+            let mut solution: Solution<Self::IndexType> = Solution::from_nodes(vec![i]);
+            let mut prev = prevs[i];
+            while let Some(node) = prev {
+                created = true;
+
+                // only push self once (probably only important for to_node)
+                if i != node {
+                    solution.push_node(node);
+                }
+
+                let n_prev = prevs[node];
+                // only to_node has prev[node] == node so we iterate as long as we haven't reached that
+                if n_prev != prev {
+                    prev = n_prev
+                } else {
+                    prev = None
+                }
+            }
+            // if we can reach the node we created a solution
+            if created {
+                res.insert(i, Some((solution, dists[i])));
+            } else {
+                res.insert(i, None);
+            }
+        }
+
+        res
+    }
 }
 
-impl<Nw: Copy, Ew: Copy> WeightedGraph<Nw, Ew> for MatrixGraph<usize, Nw, Ew> {}
+// impl<Nw: Copy, Ew: Copy> WeightedGraph for MatrixGraph<usize, Nw, Ew> {}
 
-impl<Nw: Copy, Ew: Copy> GeoGraph<Nw, Ew> for MatrixGraph<GeoPoint, Nw, Ew> {}
+// impl<Nw: Copy, Ew: Copy> GeoGraph for MatrixGraph<GeoPoint, Nw, Ew> {}
 
 #[cfg(test)]
 mod usize_indexed_tests {
@@ -734,6 +1078,14 @@ mod usize_indexed_tests {
         MatrixGraph::new_usize_indexed(
             vec![1, 2, 3],
             vec![(0, 1, 100), (1, 2, 101), (2, 1, 50), (2, 0, 200)],
+        )
+        .unwrap()
+    }
+
+    fn inv_valid_weighted() -> MatrixGraph<usize, usize, usize> {
+        MatrixGraph::new_usize_indexed(
+            vec![1, 2, 3],
+            vec![(1, 0, 100), (2, 1, 101), (1, 2, 50), (0, 2, 200)],
         )
         .unwrap()
     }
@@ -957,8 +1309,8 @@ mod usize_indexed_tests {
             "Node 1 should only have 2 as neighbor."
         );
         assert_eq!(
-            graph.neighbor_ids(2).unwrap().sort(),
-            vec![1, 0].sort(),
+            graph.neighbor_ids(2).unwrap().sort_unstable(),
+            vec![1, 0].sort_unstable(),
             "Node 2 should have 1 and 0 as neighbor."
         );
         assert_eq!(
@@ -1006,8 +1358,8 @@ mod usize_indexed_tests {
             "Size should not change during node insertion."
         );
         assert_eq!(
-            graph.node_ids().sort(),
-            vec![0, 1, 2, 4].sort(),
+            graph.node_ids().sort_unstable(),
+            vec![0, 1, 2, 4].sort_unstable(),
             "Node list was not updated correctly after insertion."
         );
         assert_eq!(
@@ -1060,13 +1412,13 @@ mod usize_indexed_tests {
             "Size was updated incorrectly after removal."
         );
         assert_eq!(
-            graph.node_ids().sort(),
-            vec![0, 2].sort(),
+            graph.node_ids().sort_unstable(),
+            vec![0, 2].sort_unstable(),
             "Nodelist was updated incorrectly after removal."
         );
         assert_eq!(
-            graph.edge_ids().sort(),
-            vec![(2, 0)].sort(),
+            graph.edge_ids().sort_unstable(),
+            vec![(2, 0)].sort_unstable(),
             "Edgelist was updated incorrectly after removal."
         );
     }
@@ -1217,13 +1569,103 @@ mod usize_indexed_tests {
         );
     }
 
+    #[test]
+    fn internal_shortest_path_works() {
+        let graph = valid_weighted();
+        let (prevs, dists) = graph._shortest_paths(0);
+
+        assert_eq!(prevs[0], Some(0), "0 should always go via 0");
+        assert_eq!(prevs[1], Some(0), "1 should have a direct path to 0");
+        assert_eq!(prevs[2], Some(1), "2 should go via 1");
+
+        assert_eq!(dists[0], 0, "Distance to start node should be 0");
+        assert_eq!(
+            dists[1], 100,
+            "Distance to 1 should be 100 via straight path"
+        );
+        assert_eq!(dists[2], 201, "Distance to 2 should be 201 via path over 1");
+    }
+
+    #[test]
+    fn shortest_paths_works() {
+        let graph = valid_weighted();
+        let map = graph.shortest_paths(0);
+
+        assert_eq!(
+            map[&0],
+            Some((Solution::from_nodes(vec![0]), 0)),
+            "0 is the start node"
+        );
+        assert_eq!(
+            map[&1],
+            Some((Solution::from_nodes(vec![0, 1]), 100)),
+            "1 should have a direct path to 0 with length 100"
+        );
+        assert_eq!(
+            map[&2],
+            Some((Solution::from_nodes(vec![0, 1, 2]), 201)),
+            "2 should go via 1 and have length 201"
+        );
+    }
+
+    #[test]
+    fn internal_iter_neighbors_inv_works() {
+        let graph = valid_weighted();
+        let neighbors: Vec<_> = graph._iter_inv_neighbors(0).unwrap().collect();
+
+        assert_eq!(
+            neighbors,
+            vec![(2, &200)],
+            "Node 0 only has one inverse neighbor, which is 2"
+        )
+    }
+
+    #[test]
+    fn internal_inv_shortest_path_works() {
+        let graph = inv_valid_weighted();
+        let (prevs, dists) = graph._inv_shortest_paths(0);
+
+        assert_eq!(prevs[0], Some(0), "0 should always go via 0");
+        assert_eq!(prevs[1], Some(0), "1 should have a direct path to 0");
+        assert_eq!(prevs[2], Some(1), "2 should go via 1");
+
+        assert_eq!(dists[0], 0, "Distance to start node should be 0");
+        assert_eq!(
+            dists[1], 100,
+            "Distance to 1 should be 100 via straight path"
+        );
+        assert_eq!(dists[2], 201, "Distance to 2 should be 201 via path over 1");
+    }
+
+    #[test]
+    fn inv_shortest_paths_works() {
+        let graph = inv_valid_weighted();
+        let map = graph.inv_shortest_paths(0);
+
+        assert_eq!(
+            map[&0],
+            Some((Solution::from_nodes(vec![0]), 0)),
+            "0 is the start node"
+        );
+        assert_eq!(
+            map[&1],
+            Some((Solution::from_nodes(vec![1, 0]), 100)),
+            "1 should have a direct path to 0 with length 100"
+        );
+        assert_eq!(
+            map[&2],
+            Some((Solution::from_nodes(vec![2, 1, 0]), 201)),
+            "2 should go via 1 and have length 201"
+        );
+    }
+
     #[bench]
     fn bench_iter_edge_ids(b: &mut Bencher) {
         let graph = valid_weighted();
 
         b.iter(|| {
-            for _ in valid_weighted().iter_edge_ids() {
-                let n = test::black_box(1);
+            for _ in graph.iter_edge_ids() {
+                let _n = test::black_box(1);
             }
         })
     }
@@ -1233,8 +1675,8 @@ mod usize_indexed_tests {
         let graph = valid_weighted();
 
         b.iter(|| {
-            for _ in valid_weighted().iter_edges() {
-                let n = test::black_box(1);
+            for _ in graph.iter_edges() {
+                let _n = test::black_box(1);
             }
         })
     }
@@ -1244,8 +1686,8 @@ mod usize_indexed_tests {
         let graph = valid_weighted();
 
         b.iter(|| {
-            for _ in valid_weighted().edge_ids() {
-                let n = test::black_box(1);
+            for _ in graph.edge_ids() {
+                let _n = test::black_box(1);
             }
         })
     }
@@ -1255,10 +1697,10 @@ mod usize_indexed_tests {
         let graph = valid_weighted();
 
         b.iter(|| {
-            let edges = valid_weighted().edge_ids();
+            let edges = graph.edge_ids();
             for edge in edges {
-                valid_weighted().edge_weight(edge).unwrap();
-                let n = test::black_box(1);
+                graph.edge_weight(edge).unwrap();
+                let _n = test::black_box(1);
             }
         })
     }
@@ -1288,6 +1730,23 @@ mod geopoint_indexed_tests {
         .unwrap()
     }
 
+    fn inv_valid_weighted() -> MatrixGraph<GeoPoint, usize, usize> {
+        let p1 = GeoPoint::from_degrees(12.7, 21.8);
+        let p2 = GeoPoint::from_degrees(9.7, 12.5);
+        let p3 = GeoPoint::from_degrees(11.1, 32.5);
+
+        MatrixGraph::new(
+            vec![(p1, 12), (p2, 21), (p3, 7)],
+            vec![
+                ((p2, p1), 100),
+                ((p3, p2), 101),
+                ((p2, p3), 50),
+                ((p1, p3), 200),
+            ],
+        )
+        .unwrap()
+    }
+
     #[test]
     fn new_empty_weighted_works() {
         let graph = MatrixGraph::<GeoPoint, usize, usize>::default();
@@ -1309,12 +1768,8 @@ mod geopoint_indexed_tests {
         let graph = MatrixGraph::<GeoPoint, usize, usize>::with_size(5);
 
         assert!(
-            graph.node_map.capacity() >= 5,
+            graph.node_weights.len() >= 5,
             "Not enough space in node map."
-        );
-        assert!(
-            graph.inv_node_map.capacity() >= 5,
-            "Not enough space in inverse node map."
         );
         assert_eq!(
             graph.node_ids().len(),
@@ -1343,6 +1798,17 @@ mod geopoint_indexed_tests {
             graph.inv_node_map.contains_key(&2),
             "Inverse node map is missing a key."
         );
+
+        assert_eq!(
+            graph.adjacency_matrix,
+            vec![
+                vec![None, Some(100), None],
+                vec![None, None, Some(101)],
+                vec![Some(200), Some(50), None],
+            ]
+        );
+
+        assert_eq!(graph.node_weights, vec![Some(12), Some(21), Some(7)]);
     }
 
     #[test]
@@ -1419,9 +1885,10 @@ mod geopoint_indexed_tests {
         let p4 = GeoPoint::from_degrees(2.4, 53.3);
         let empty = MatrixGraph::<GeoPoint, usize, usize>::default();
 
+        // The nodes in id list will be sorted according to the id types ordering
         assert_eq!(
-            graph.node_ids().sort(),
-            vec![p1, p2, p3].sort(),
+            graph.node_ids(),
+            vec![p2, p3, p1],
             "Nodes are not the ones used to construct."
         );
         assert_eq!(
@@ -1433,8 +1900,8 @@ mod geopoint_indexed_tests {
         graph.add_node(p4, 5).unwrap();
 
         assert_eq!(
-            graph.node_ids().sort(),
-            vec![p1, p2, p3, p4].sort(),
+            graph.node_ids(),
+            vec![p4, p2, p3, p1],
             "The node p4 should be in, since it was just added."
         );
     }
@@ -1741,6 +2208,56 @@ mod geopoint_indexed_tests {
         assert!(
             !graph.has_edge((p1, p2)),
             "Multiple deletions should not insert the edge back."
+        );
+    }
+
+    #[test]
+    fn shortest_paths_works() {
+        let graph = valid_weighted();
+        let p1 = GeoPoint::from_degrees(12.7, 21.8);
+        let p2 = GeoPoint::from_degrees(9.7, 12.5);
+        let p3 = GeoPoint::from_degrees(11.1, 32.5);
+        let map = graph.shortest_paths(p1);
+
+        assert_eq!(
+            map[&p1],
+            Some((Solution::from_nodes(vec![p1]), 0)),
+            "0 is the start node"
+        );
+        assert_eq!(
+            map[&p2],
+            Some((Solution::from_nodes(vec![p1, p2]), 100)),
+            "1 should have a direct path to 0 with length 100"
+        );
+        assert_eq!(
+            map[&p3],
+            Some((Solution::from_nodes(vec![p1, p2, p3]), 201)),
+            "2 should go via 1 and have length 201"
+        );
+    }
+
+    #[test]
+    fn internal_inv_shortest_path_works() {
+        let p1 = GeoPoint::from_degrees(12.7, 21.8);
+        let p2 = GeoPoint::from_degrees(9.7, 12.5);
+        let p3 = GeoPoint::from_degrees(11.1, 32.5);
+        let graph = inv_valid_weighted();
+        let map = graph.inv_shortest_paths(p1);
+
+        assert_eq!(
+            map[&p1],
+            Some((Solution::from_nodes(vec![p1]), 0)),
+            "0 is the start node"
+        );
+        assert_eq!(
+            map[&p2],
+            Some((Solution::from_nodes(vec![p2, p1]), 100)),
+            "1 should have a direct path to 0 with length 100"
+        );
+        assert_eq!(
+            map[&p3],
+            Some((Solution::from_nodes(vec![p3, p2, p1]), 201)),
+            "2 should go via 1 and have length 201"
         );
     }
 }
