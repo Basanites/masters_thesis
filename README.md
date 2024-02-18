@@ -1,4 +1,4 @@
-# Using ACO to solve dynamic OP [![Build Status](https://travis-ci.com/Basanites/masters_thesis.svg?branch=master)](https://travis-ci.com/Basanites/masters_thesis)
+# Using ACO to solve dynamic OP [![Build Status](https://travis-ci.com/Basanites/masters_thesis.svg?token=QsL71Bx4xNLGumpACMGx&branch=master)](https://travis-ci.com/Basanites/masters_thesis)
 
 ## Table of contents
 * [General info](#general-info)
